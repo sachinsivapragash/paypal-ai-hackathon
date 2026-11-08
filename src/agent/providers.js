@@ -35,6 +35,7 @@ function gemini({ apiKey, model, fetchImpl = globalThis.fetch, system }) {
 // Lets judges try every flow with zero keys. Clearly labelled as demo mode in the UI.
 function demo() {
   const money = /(?:\$|usd\s*)?(\d[\d,]*(?:\.\d{1,2})?)\s*(usd|eur|gbp|cad|aud|jpy|sgd|dollars|euros|pounds)?/i;
+  const EMAIL_RE = /[^\s@,<>()]+@[^\s@,<>()]+\.[a-z]{2,}/gi;
   const cur = { dollars: 'USD', euros: 'EUR', pounds: 'GBP' };
   function parse(text) {
     const t = text.trim();
@@ -48,7 +49,7 @@ function demo() {
     }
     if (/\b(pay|payout|send money)\b/.test(lower) && !/\binvoice\b/.test(lower)) {
       const email = t.match(/[^\s@,<>()]+@[^\s@,<>()]+\.[a-z]{2,}/i)?.[0] || '';
-      const amt = t.match(money);
+      const amt = t.replace(EMAIL_RE, ' ').match(money);
       const note = t.match(/\bfor\s+(?:the\s+)?(.+?)(?:[,.]|$)/i)?.[1] || 'Contract work';
       return [{ name: 'pay_contractor', args: { recipient_email: email, amount: amt ? Number(amt[1].replace(/,/g, '')) : NaN, currency: amt?.[2] ? (cur[amt[2].toLowerCase()] || amt[2].toUpperCase()) : 'USD', note } }];
     }
@@ -65,7 +66,7 @@ function demo() {
       const name = t.match(/(?:[Ii]nvoice|[Bb]ill|[Cc]harge)\s+([A-Z][\w&'.-]*(?:\s+[A-Z][\w&'.-]*)*)/)?.[1]
         || t.match(/(?:invoice|bill|charge)\s+([\w&'.-]+)/i)?.[1];
       const email = t.match(/[^\s@,<>()]+@[^\s@,<>()]+\.[a-z]{2,}/i)?.[0];
-      const amt = t.replace(/net\s*\d+/i, '').replace(/\d+\s*(?:days|reminders?)/gi, '').match(money);
+      const amt = t.replace(EMAIL_RE, ' ').replace(/net\s*\d+/i, '').replace(/\d+\s*(?:days|reminders?)/gi, '').match(money);
       const net = Number(t.match(/net\s*(\d+)/i)?.[1] ?? t.match(/(\d+)\s*days/i)?.[1] ?? 7);
       const remWord = { once: 1, twice: 2, thrice: 3, 'three times': 3 };
       const remMatch = lower.match(/remind(?: them)?\s+(once|twice|thrice|three times|(\d)\s*times?)/);

@@ -65,7 +65,7 @@ With an empty `.env` it starts in **demo mode**: try the suggestion chips, appro
 Run the tests: `npm test` (agent flow, guardrails, idempotency, retries, webhook signature verification, Gemini mapping).
 
 ## Use the real PayPal sandbox
-1. Log in at https://developer.paypal.com → **Apps & Credentials** → **Sandbox** → *Create App* (Merchant). Copy the Client ID and Secret into `.env` as `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET`.
+1. Log in at https://developer.paypal.com → **Testing Tools → Sandbox Accounts** → create a **US Business** and a **US Personal** account. Then **Apps & Credentials** → **Sandbox** → *Create App* (Merchant, linked to the US business account) → under *Features* tick **Invoicing** → *Save Changes*. Copy the Client ID and Secret into `.env` as `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET`.
 2. **Testing Tools → Sandbox Accounts:** note the *Business* account email (put it in `PAYPAL_INVOICER_EMAIL`) and the *Personal* (buyer) account. You'll pay invoices with the buyer.
 3. In your app, **Add Webhook** with URL `https://<your-host>/api/webhooks/paypal` and events `Invoicing invoice paid` and `Invoicing invoice cancelled`. Copy the Webhook ID into `PAYPAL_WEBHOOK_ID`. (Webhooks need a public URL: use the Render deployment.)
 4. Optional: free Gemini key from https://aistudio.google.com/apikey → `GEMINI_API_KEY`.
@@ -85,7 +85,8 @@ See [`.env.example`](.env.example). Every key is optional; missing keys switch t
 
 ## Limitations (honest)
 - Single-user demo: no auth, JSON-file storage. Production would need accounts and a real database.
-- PayPal Payouts can't be sent from an India-registered sandbox business account (`PAYOUT_NOT_AVAILABLE`); use a US sandbox business account for payouts. Invoicing works from any country.
+- Use **US** sandbox accounts. PayPal blocks Payouts from India-registered accounts (`PAYOUT_NOT_AVAILABLE`) and payments between two India sandbox accounts.
+- New sandbox apps have **Invoicing** switched off: enable it under the app's *Features* and save (it can take a minute to apply).
 - Payout webhooks are not reconciled yet (status comes from the create response).
 - Voice input uses the browser's Web Speech API (Chrome/Edge).
 

@@ -37,6 +37,7 @@ Gemini 2.5 Flash function calling (free tier), provider interface in `src/agent/
 
 ## Status / open risks
 - ✅ Nov 8: verified against the real PayPal sandbox: OAuth, create, send (real pay link), get, remind, cancel, plus the full chat → approve → invoice SENT flow through the app.
-- ⚠️ Payouts return `PAYOUT_NOT_AVAILABLE` because the default sandbox business account is registered in India. Fix: create a US sandbox business account and an app linked to it, or present Payouts as demo-only.
+- ⚠️ India-registered sandbox accounts block Payouts (`PAYOUT_NOT_AVAILABLE`) and India-to-India invoice payments. ✅ Fixed by switching to US sandbox business + personal accounts and a new app ("DuePilot US") with Invoicing enabled.
+- ✅ Nov 8: full loop verified on real sandbox: chat → approve → invoice sent → US buyer paid $45 on PayPal → Sync → PAID. Payout of $1.50 accepted (batch PENDING).
 - Webhook not yet registered (needs the public Render URL). Until then, use the Sync button to pull PAID status.
 - Sandbox Payouts may need to be enabled on the sandbox business account.

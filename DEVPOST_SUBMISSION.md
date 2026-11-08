@@ -64,8 +64,8 @@ node.js, express, javascript, ag-grid, html, css, paypal-invoicing-api, paypal-p
 2. Click the first suggestion chip (or type: `Invoice Acme Corp <buyer sandbox email> 45 USD for logo work, net 7, remind them twice`) and press Send.
 3. Review the approval card → **Approve**. The invoice appears as SENT with a PayPal pay link.
 4. Open the pay link and pay with the PayPal **sandbox buyer** account:
-   - Email: `<sandbox personal account email>`
-   - Password: `<sandbox personal account password>` (sandbox only, no real money)
+   - Email: `sb-ratla53771659@personal.example.com`
+   - Password: `<paste in the Devpost form only; not stored in the repo>` (sandbox only, no real money)
 5. Return to DuePilot. Within seconds the invoice shows **PAID** (verified webhook). See the Audit log tab.
 6. Try: `Who should I chase first?`, `Remind Acme`, `Pay <another sandbox email> 20 USD for illustrations`, `Cash flow summary`.
 7. To run locally with no keys: `npm run setup && npm start` (demo mode).

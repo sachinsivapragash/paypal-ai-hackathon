@@ -75,6 +75,16 @@ test('payout, reminder and cancel flows', async () => {
   } finally { await t.close(); }
 });
 
+test('digits inside an email address are never read as the amount', async () => {
+  const t = await start();
+  try {
+    const r = await t.post('/api/chat', { message: 'Invoice Acme Corp sb-ratla53771659@personal.example.com 45 USD for the logo work' });
+    assert.strictEqual(r.body.proposals[0].data.amount, 45);
+    const p = await t.post('/api/chat', { message: 'Pay sb-abc12345@personal.example.com 20 USD for edits' });
+    assert.strictEqual(p.body.proposals[0].data.amount, 20);
+  } finally { await t.close(); }
+});
+
 test('missing email is rejected by schema validation, not guessed silently by the API', async () => {
   const { validateInvoice } = require('../src/agent/tools');
   const r = validateInvoice({ client_name: 'Acme', client_email: 'nope', amount: 10, description: 'x y' }, 5000);
