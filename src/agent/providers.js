@@ -52,6 +52,8 @@ function demo() {
   function parse(text) {
     const t = text.trim();
     const lower = t.toLowerCase();
+    const intake = t.match(/<client_email>([\s\S]*)<\/client_email>/i);
+    if (intake) return parseEmail(intake[1]);
     const isInvoiceRequest = /^(please\s+)?(invoice|bill|charge)\b/.test(lower);
     if (/\b(who should i (chase|remind|follow up)|insights?|risk|late payers?|slow payers?|who pays)\b/.test(lower)) return [{ name: 'client_insights', args: {} }];
     if (!isInvoiceRequest && /\b(remind|nudge|follow up|chase)\b/.test(lower)) {
@@ -93,9 +95,26 @@ function demo() {
     }
     return null;
   }
+  // Keyless extraction from a pasted client email: sender, "N things at $X each", "$X for thing".
+  function parseEmail(body) {
+    const from = body.match(/^\s*from:\s*(.*)$/im)?.[1] || '';
+    const email = (from.match(EMAIL_RE) || body.match(EMAIL_RE) || [''])[0];
+    let name = from.replace(EMAIL_RE, '').replace(/[<>"]/g, '').trim();
+    if (!name) name = body.match(/(?:thanks|regards|cheers|best),?\s*\n+\s*([A-Z][^\n]{1,40})/i)?.[1]?.trim() || '';
+    if (!name && email) name = email.split('@')[1].split('.')[0].replace(/^\w/, (c) => c.toUpperCase());
+    const text = body.replace(EMAIL_RE, ' ');
+    const items = [];
+    const re = /(\d+)\s*(?:x\s*)?([a-z][a-z \-]{2,40}?)\s*(?:at|@)\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)(?:\s*each)?/gi;
+    let m;
+    while ((m = re.exec(text))) items.push({ name: m[2].trim().replace(/^\w/, (c) => c.toUpperCase()), quantity: Number(m[1]), unit_amount: Number(m[3].replace(/,/g, '')) });
+    const re2 = /\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:for|–|-)\s*(?:the\s+|a\s+|an\s+)?([a-z][a-z \-]{2,40})/gi;
+    if (!items.length) while ((m = re2.exec(text))) items.push({ name: m[2].trim().replace(/^\w/, (c) => c.toUpperCase()), quantity: 1, unit_amount: Number(m[1].replace(/,/g, '')) });
+    const desc = items.length ? items.map((i) => i.name).join(', ') : 'Professional services';
+    return [{ name: 'create_invoice', args: { client_name: name, client_email: email, items, description: desc, net_days: 7, reminders: 1 } }];
+  }
   function describe(name, r) {
     if (!r.ok) return `I couldn't do that: ${r.errors.join('; ')}.`;
-    if (name === 'create_invoice') return `I drafted an invoice for ${r.preview.clientName}: ${r.preview.amount} ${r.preview.currency} for "${r.preview.description}", due in ${r.preview.netDays} days with ${r.preview.reminders} reminder(s). Please review and approve it on the card.`;
+    if (name === 'create_invoice') return `I drafted an invoice for ${r.preview.clientName}: ${r.preview.amount} ${r.preview.currency} for "${r.preview.description}"${r.preview.items ? ` (${r.preview.items.length} line items)` : ''}, due in ${r.preview.netDays} days with ${r.preview.reminders} reminder(s). Please review and approve it on the card.`;
     if (name === 'send_reminder') return `Here's a reminder for invoice #${r.preview.number} (${r.preview.clientName}). Approve it to send through PayPal.`;
     if (name === 'client_insights') {
       if (!r.clients.length) return 'No payment history yet. Send a few invoices first.';

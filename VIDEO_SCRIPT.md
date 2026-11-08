@@ -11,7 +11,8 @@ Record at 1920×1080, browser zoom 110-125%, real sandbox mode (badges show "Pay
 | 1:00-1:15 | Approve → row appears SENT, pay link | "Approved. DuePilot created and sent a real PayPal invoice, with an idempotency key so a retry can never double-bill." |
 | 1:15-1:45 | Open pay link → PayPal sandbox page → log in as buyer → pay | "Now I'm the client. I pay on PayPal's own invoice page with a sandbox buyer account." |
 | 1:45-2:00 | Back to DuePilot: row flips to PAID, KPIs update, Audit log tab shows `reconciled_payment` | "PayPal sends a webhook. DuePilot verifies its signature, de-duplicates it and reconciles the payment automatically." |
-| 2:00-2:15 | Type "Pay maria@… 20 USD for illustrations" → card → Approve → Payouts tab | "It also pays my contractors through PayPal Payouts, under a per-payout limit." |
+| 1:58-2:10 | Click ✉, "Use a sample", Draft invoice → itemised card (3 × $150 + $60) | "Clients often ask by email. I just paste it: Gemini pulls out the line items, and anything in the email that looks like an instruction is ignored." |
+| 2:10-2:20 | Type "Pay maria@… 20 USD for illustrations" → card → Approve → Payouts tab | "It also pays my contractors through PayPal Payouts, under a per-payout limit." |
 | 2:15-2:25 | Type "Cash flow summary" | "And it answers questions about my cash flow." |
 | 2:25-2:40 | Architecture slide or README diagram | "Under the hood: PayPal Invoicing, Payouts and verified webhooks; Gemini function calling with schema-validated tools; human approval; a full audit log; and tests. DuePilot: get paid without chasing." |
 

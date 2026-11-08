@@ -91,6 +91,12 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; } th.num { text-
 .risk-medium { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
 .risk-low { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
 .insight-lead { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); padding: 20px; width: min(560px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+dialog::backdrop { background: rgba(10, 12, 20, .45); }
+dialog h2 { margin-bottom: 6px; }
+.muted { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+dialog textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; resize: vertical; }
+.dialog-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
 .foot { text-align: center; color: var(--muted); font-size: 12px; padding: 8px 24px 24px; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; transition: transform .25s; max-width: calc(100vw - 32px); z-index: 10; }
 .toast.show { transform: translateX(-50%) translateY(0); }

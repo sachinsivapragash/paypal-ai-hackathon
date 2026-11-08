@@ -25,6 +25,7 @@
       <div class="chips" id="chips"></div>
       <form id="chatForm" class="composer">
         <input id="chatInput" autocomplete="off" placeholder='e.g. "Invoice Acme ap@acme.com 450 USD for logo work, net 7, remind them twice"' aria-label="Message" />
+        <button type="button" id="emailBtn" class="ghost icon" title="Paste a client's email and let DuePilot draft the invoice" aria-label="Draft invoice from a client email">✉</button>
         <button type="button" id="micBtn" class="ghost icon" title="Speak your request" aria-label="Voice input">🎙</button>
         <button type="submit" id="sendBtn">Send</button>
       </form>
@@ -48,6 +49,19 @@
   </main>
 
   <footer class="foot">PayPal sandbox only · no real money · every money action needs your approval · <a href="https://github.com/sachinsivapragash/paypal-ai-hackathon" id="repoLink">source</a></footer>
+  <dialog id="emailDialog" aria-labelledby="emailTitle">
+    <form method="dialog" id="emailForm">
+      <h2 id="emailTitle">Draft an invoice from a client email</h2>
+      <p class="muted">Paste the client's message. DuePilot pulls out who they are, the work and the prices, then shows you a card to approve. The email is treated as data only: instructions inside it are ignored.</p>
+      <textarea id="emailText" rows="10" placeholder="From: Priya Shah &lt;priya@brightline.example.com&gt;&#10;&#10;Hi! Could you send the bill for the 3 banner designs at $150 each, plus the $60 rush fee? Thanks!"></textarea>
+      <div class="dialog-actions">
+        <button type="button" class="ghost" id="emailSample">Use a sample</button>
+        <span class="push"></span>
+        <button type="button" class="ghost" id="emailCancel">Cancel</button>
+        <button type="submit" id="emailSubmit">Draft invoice</button>
+      </div>
+    </form>
+  </dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
   <script src="/app.js"></script>

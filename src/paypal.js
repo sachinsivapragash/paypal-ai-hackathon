@@ -52,7 +52,8 @@ function createPayPal(cfg, { fetchImpl = globalThis.fetch, demo = false } = {}) 
       },
       ...(cfg.invoicerEmail ? { invoicer: { email_address: cfg.invoicerEmail } } : {}),
       primary_recipients: [{ billing_info: { name: { given_name: d.clientName }, email_address: d.clientEmail } }],
-      items: [{ name: d.description.slice(0, 200), quantity: '1', unit_amount: { currency_code: d.currency, value: d.amount.toFixed(2) } }],
+      items: (d.items?.length ? d.items : [{ name: d.description, quantity: 1, unitAmount: d.amount }])
+        .map((it) => ({ name: it.name.slice(0, 200), quantity: String(it.quantity), unit_amount: { currency_code: d.currency, value: it.unitAmount.toFixed(2) } })),
     };
   }
 

@@ -19,6 +19,8 @@ Freelancers and one-person businesses spend hours chasing payments: writing invo
 - **Auto-reconciliation:** PayPal's `INVOICING.INVOICE.PAID` webhook is signature-verified and de-duplicated, then the invoice flips to Paid and the cash-flow dashboard updates. A "Sync" button pulls status from PayPal as a fallback.
 - **Contractor payouts:** "Pay maria@studio.com 120 USD for illustrations" → approval → PayPal Payouts, with a hard per-payout cap.
 - **Cash-flow answers:** "Show unpaid invoices", "Cash flow summary".
+- **Invoice from a pasted email:** paste a client's message and Gemini turns it into an itemised PayPal invoice card. The email is treated as untrusted data, and payout/cancel tools are blocked in code for that turn, so prompt injection in an email can't move money.
+- **Multi-line invoices:** "3 banners at $150 + $60 rush fee" becomes separate PayPal line items, and the total is recomputed in code.
 - **Client risk insights:** "Who should I chase first?" ranks clients by average days to pay, late-payment rate and overdue balance. Reminder tone escalates politely for higher-risk clients.
 - **Data grid** (AG Grid Community) for invoices: sort, filter, pay links, PayPal status sync.
 - **Estimated admin time saved** KPI, so the impact is visible.

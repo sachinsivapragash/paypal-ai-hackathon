@@ -17,7 +17,9 @@ function addMsg(text, cls) { const d = document.createElement('div'); d.classNam
 const LABEL = { create_invoice: 'Send PayPal invoice', send_reminder: 'Send reminder', cancel_invoice: 'Cancel invoice', pay_contractor: 'PayPal payout' };
 function cardFields(p) {
   const d = p.data;
-  if (p.type === 'create_invoice') return [['Client', d.clientName], ['Email', d.clientEmail], ['Amount', fmt(d.amount, d.currency)], ['For', d.description], ['Terms', `Net ${d.netDays}`], ['Auto reminders', d.reminders]];
+  if (p.type === 'create_invoice') return [['Client', d.clientName], ['Email', d.clientEmail], ['For', d.description],
+    ...(d.items?.length ? d.items.map((it, i) => [i ? '' : 'Items', `${it.quantity} × ${it.name} @ ${fmt(it.unitAmount, d.currency)}`]) : []),
+    ['Total', fmt(d.amount, d.currency)], ['Terms', `Net ${d.netDays}`], ['Auto reminders', d.reminders]];
   if (p.type === 'pay_contractor') return [['To', d.recipientEmail], ['Amount', fmt(d.amount, d.currency)], ['For', d.note]];
   if (p.type === 'send_reminder') return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)], ['Message', d.message]];
   return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)]];
@@ -134,6 +136,26 @@ $('#chatForm').addEventListener('submit', async (e) => {
     r.proposals.filter(Boolean).forEach(renderCard); setState(r.state);
   } catch (err) { typing.remove(); addMsg(`Something went wrong: ${err.message}`, 'bot err'); }
   finally { $('#sendBtn').disabled = false; input.focus(); }
+});
+
+// Paste-a-client-email intake.
+const SAMPLE_EMAIL = 'From: Priya Shah <priya@brightline.example.com>\n\nHi! Loved the work this month. Could you send me the bill for the 3 banner designs at $150 each, plus 1 rush fee at $60? We usually pay within two weeks.\n\nThanks,\nPriya\nBrightline Studio';
+$('#emailBtn').addEventListener('click', () => { $('#emailDialog').showModal(); $('#emailText').focus(); });
+$('#emailCancel').addEventListener('click', () => $('#emailDialog').close());
+$('#emailSample').addEventListener('click', () => { $('#emailText').value = SAMPLE_EMAIL; });
+$('#emailForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = $('#emailText').value.trim();
+  if (text.length < 10) { toast('Paste the client email first'); return; }
+  $('#emailDialog').close();
+  addMsg(`📧 Pasted a client email (${text.length} characters)`, 'user');
+  const typing = addMsg('DuePilot is reading the email…', 'bot typing');
+  try {
+    const r = await api('/api/intake', { email: text });
+    typing.remove(); addMsg(r.reply, 'bot');
+    r.proposals.filter(Boolean).forEach(renderCard); setState(r.state);
+    $('#emailText').value = '';
+  } catch (err) { typing.remove(); addMsg(`Something went wrong: ${err.message}`, 'bot err'); }
 });
 
 $('#seedBtn').addEventListener('click', async () => { try { setState(await api('/api/demo/seed', {})); toast('Loaded sample clients and payment history'); } catch (err) { toast(err.message); } });

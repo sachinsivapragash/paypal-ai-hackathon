@@ -7,19 +7,32 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const declarations = [
   {
     name: 'create_invoice',
-    description: 'Draft a PayPal invoice for a client. It is NOT sent until the user approves it.',
+    description: 'Draft a PayPal invoice for a client. It is NOT sent until the user approves it. When the work has several parts (e.g. "3 banners at $150 each plus a $60 rush fee"), pass them as line items; the total is computed from the items.',
     parameters: {
       type: 'object',
       properties: {
         client_name: { type: 'string', description: 'Client or company name' },
         client_email: { type: 'string', description: 'Client email address' },
-        amount: { type: 'number', description: 'Total amount, e.g. 450' },
+        amount: { type: 'number', description: 'Total amount for a single-line invoice, e.g. 450. Omit when using items.' },
+        items: {
+          type: 'array',
+          description: 'Line items. Use for anything with more than one part.',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Short item name, e.g. "Banner design"' },
+              quantity: { type: 'number', description: 'How many, default 1' },
+              unit_amount: { type: 'number', description: 'Price per unit' },
+            },
+            required: ['name', 'unit_amount'],
+          },
+        },
         currency: { type: 'string', description: 'ISO currency code, default USD' },
-        description: { type: 'string', description: 'What the work was' },
+        description: { type: 'string', description: 'What the work was (one line summary)' },
         net_days: { type: 'integer', description: 'Payment terms in days, default 7' },
         reminders: { type: 'integer', description: 'How many automatic reminders (0-3), default 1' },
       },
-      required: ['client_name', 'client_email', 'amount', 'description'],
+      required: ['client_name', 'client_email', 'description'],
     },
   },
   {
@@ -73,7 +86,21 @@ const declarations = [
 // Schema validation for model output: never trust LLM arguments blindly.
 function validateInvoice(a, maxAmount) {
   const errors = [];
-  const amount = Number(a.amount);
+  // Line items: validated one by one; the total is ALWAYS recomputed here, never taken from the model.
+  let items = null;
+  if (Array.isArray(a.items) && a.items.length) {
+    if (a.items.length > 20) errors.push('at most 20 line items');
+    items = a.items.slice(0, 20).map((it, i) => {
+      const quantity = it.quantity == null ? 1 : Number(it.quantity);
+      const unit = Number(it.unit_amount);
+      const name = String(it.name || '').trim().slice(0, 200);
+      if (!name) errors.push(`item ${i + 1} needs a name`);
+      if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1000) errors.push(`item ${i + 1} quantity must be 1-1000`);
+      if (!Number.isFinite(unit) || unit <= 0) errors.push(`item ${i + 1} price must be positive`);
+      return { name, quantity, unitAmount: Math.round(unit * 100) / 100 };
+    });
+  }
+  const amount = items ? items.reduce((s, it) => s + it.quantity * it.unitAmount, 0) : Number(a.amount);
   const currency = String(a.currency || 'USD').toUpperCase();
   const netDays = a.net_days == null ? 7 : Number(a.net_days);
   const reminders = a.reminders == null ? 1 : Number(a.reminders);
@@ -93,6 +120,7 @@ function validateInvoice(a, maxAmount) {
       amount: Math.round(amount * 100) / 100,
       currency,
       description: String(a.description || '').trim(),
+      ...(items ? { items } : {}),
       netDays,
       reminders,
     },
@@ -170,7 +198,11 @@ function publicInvoice(inv) {
 }
 
 // Executes a tool call from the model. Returns a JSON-able result for the model.
-function runTool(name, args, { store, config }) {
+function runTool(name, args, { store, config, allowedTools }) {
+  if (allowedTools && !allowedTools.includes(name)) {
+    store.audit('system', 'tool_blocked', { tool: name, reason: 'not allowed while processing a pasted email' });
+    return { ok: false, errors: [`${name} is not allowed while processing a pasted client email`] };
+  }
   switch (name) {
     case 'create_invoice': {
       const { errors, value } = validateInvoice(args || {}, config.maxInvoiceAmount);

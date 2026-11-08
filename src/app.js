@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { createStore } = require('./store');
 const { createPayPal } = require('./paypal');
-const { createProvider, runAgent } = require('./agent');
+const { createProvider, runAgent, intakeMessage } = require('./agent');
 const { summary, effectiveStatus, clientInsights, reminderMessage, timeSaved } = require('./agent/tools');
 const { seedDemo } = require('./seed');
 
@@ -43,6 +43,17 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     res.json({ reply: out.reply, proposals: out.proposals.map((id) => store.getPending(id)), state: view() });
   }));
 
+  // Paste a client's email -> agent drafts the invoice. The email is untrusted third-party text:
+  // it is delimited for the model, and in code only invoice-drafting/read tools are allowed for this turn.
+  app.post('/api/intake', wrap(async (req, res) => {
+    const text = String(req.body?.email || '').trim();
+    if (text.length < 10) return res.status(400).json({ error: 'Paste the client email first.' });
+    store.audit('user', 'email_intake', { chars: text.length });
+    const out = await runAgent(provider, intakeMessage(text), { store, config, allowedTools: ['create_invoice', 'list_invoices', 'client_insights', 'cash_flow_summary'] }, chatHistory);
+    chatHistory = out.history.filter((h) => h.role !== 'tool' && !h.calls).slice(-8);
+    res.json({ reply: out.reply, proposals: out.proposals.map((id) => store.getPending(id)), state: view() });
+  }));
+
   // ---- Human-in-the-loop approvals: the ONLY path that touches PayPal for writes ----
   async function execute(p) {
     const d = p.data;
@@ -51,7 +62,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
       const draft = await paypal.createDraftInvoice(d, key('create'));
       const inv = store.upsertInvoice({
         id: store.id('inv'), paypalId: draft.paypalId, number: draft.number, dueDate: draft.dueDate,
-        clientName: d.clientName, clientEmail: d.clientEmail, amount: d.amount, currency: d.currency, description: d.description,
+        clientName: d.clientName, clientEmail: d.clientEmail, amount: d.amount, currency: d.currency, description: d.description, items: d.items,
         status: 'DRAFT', remindersLeft: d.reminders, remindersSent: 0, createdAt: new Date().toISOString(),
       });
       const sent = await paypal.sendInvoice(draft.paypalId, key('send'));
