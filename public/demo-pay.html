@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Demo payment</title>
+<link rel="stylesheet" href="/styles.css">
+<style>.wrap{max-width:420px;margin:10vh auto;padding:0 16px}.panel{padding:24px;gap:12px}</style></head>
+<body><div class="wrap"><div class="panel">
+  <span class="tag">Demo simulator, not PayPal</span>
+  <h2>Pay invoice</h2>
+  <p style="color:var(--muted);margin:0">With real sandbox keys this link is PayPal's own hosted invoice page, where you pay with a sandbox buyer account. In demo mode this button fires the same <code>INVOICING.INVOICE.PAID</code> event the webhook would.</p>
+  <button id="pay">Simulate buyer payment</button>
+  <p id="out" role="status"></p>
+</div></div>
+<script>
+const id = location.pathname.split('/').pop();
+document.getElementById('pay').onclick = async (e) => {
+  e.target.disabled = true;
+  const r = await fetch('/api/demo/pay/' + encodeURIComponent(id), { method: 'POST' });
+  document.getElementById('out').textContent = r.ok ? 'Paid ✓. Switch back to DuePilot: the invoice reconciles automatically.' : 'Payment failed.';
+};
+</script></body></html>

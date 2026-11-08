@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DuePilot</title>
+  <meta name="description" content="AI collections agent for freelancers, powered by PayPal invoicing and payouts." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M9 22l5-12 4 8 2-4 3 8' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">D</span><div><strong>DuePilot</strong><small>AI collections agent</small></div></div>
+    <div class="badges" id="badges"></div>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Cash flow"></section>
+
+  <main class="grid">
+    <section class="panel chat" aria-label="Agent chat">
+      <div class="panel-head"><h2>Ask DuePilot</h2><button class="ghost small" id="resetBtn" title="Clear all demo data">Reset</button></div>
+      <div class="messages" id="messages" aria-live="polite"></div>
+      <div class="chips" id="chips"></div>
+      <form id="chatForm" class="composer">
+        <input id="chatInput" autocomplete="off" placeholder='e.g. "Invoice Acme ap@acme.com 450 USD for logo work, net 7, remind them twice"' aria-label="Message" />
+        <button type="button" id="micBtn" class="ghost icon" title="Speak your request" aria-label="Voice input">🎙</button>
+        <button type="submit" id="sendBtn">Send</button>
+      </form>
+    </section>
+
+    <section class="panel data" aria-label="Records">
+      <div class="tabs" role="tablist">
+        <button role="tab" class="tab active" data-tab="invoices">Invoices</button>
+        <button role="tab" class="tab" data-tab="payouts">Payouts</button>
+        <button role="tab" class="tab" data-tab="audit">Audit log</button>
+        <button class="ghost small push" id="remindBtn" title="Send any reminders that are due now">Run reminders</button>
+      </div>
+      <div class="tabpane" id="pane-invoices"></div>
+      <div class="tabpane hidden" id="pane-payouts"></div>
+      <div class="tabpane hidden" id="pane-audit"></div>
+    </section>
+  </main>
+
+  <footer class="foot">PayPal sandbox only · no real money · every money action needs your approval · <a href="https://github.com/" id="repoLink">source</a></footer>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
