@@ -75,7 +75,7 @@ Alternatives if you can argue better: AI shopping/checkout agent for a merchant 
 
 ## 8. TECH GUIDANCE
 - Stack: pick what ships fastest and is robust (e.g. Next.js or Node/Express + a small DB such as SQLite/Postgres). Stay in PayPal **sandbox** only; never ask for or store real card data.
-- AI: use Claude via the Anthropic API with tool use for the agent (or another model if I provide keys). Add guardrails: approval step before any money moves, amount caps, structured outputs validated with a schema, audit log.
+- AI: I have NO paid API key. Use the Google Gemini API FREE tier (function calling) as the default model via a small swappable provider interface (so Groq or Claude can be dropped in). Add a keyless DEMO MODE (deterministic parser) so the app and video never break. Never hard-code keys. Add guardrails: approval step before any money moves, amount caps, structured outputs validated with a schema, audit log.
 - Secrets via env vars only. Webhook signature verification required. Idempotency keys on payment-creating calls.
 - Keep dependencies licensed permissively; list third-party assets and licenses in README.
 

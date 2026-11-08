@@ -17,7 +17,7 @@ Example: "Invoice Acme 450 USD for logo work, due in 7 days, remind them twice."
 ## Architecture
 - Backend: Node.js + Express. Store: SQLite (single file, easy to demo).
 - Frontend: simple responsive web UI (chat panel + invoices table + audit log).
-- AI: Anthropic API, tool use. Tools: `create_invoice`, `send_invoice`, `list_invoices`, `send_reminder`, `create_payout`, `cashflow_summary`.
+- AI: Google Gemini API free tier (function calling), swappable provider, plus keyless demo mode. Tools: `create_invoice`, `send_invoice`, `list_invoices`, `send_reminder`, `create_payout`, `cashflow_summary`.
 - Guardrails: approval step before send/payout, amount caps, schema validation, audit log table.
 - PayPal: sandbox REST. OAuth token, Invoicing v2, Orders v2, Payouts, Webhooks with signature verification, idempotency keys (PayPal-Request-Id).
 - Deploy: Render web service (free tier) + env vars for keys.
@@ -38,5 +38,5 @@ Never cut: invoice creation, approval step, webhook reconciliation, README, vide
 ## Needs from the user
 - PayPal sandbox app (client ID and secret) in local `.env` / Render env vars.
 - A PayPal sandbox business account (merchant) and personal account (buyer).
-- Anthropic API key for the agent.
+- Gemini API key (free, aistudio.google.com).
 - Voice-over and screen recording; YouTube upload; final Submit on Devpost.
