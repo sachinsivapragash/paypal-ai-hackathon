@@ -85,6 +85,7 @@ See [`.env.example`](.env.example). Every key is optional; missing keys switch t
 
 ## Limitations (honest)
 - Single-user demo: no auth, JSON-file storage. Production would need accounts and a real database.
+- PayPal Payouts can't be sent from an India-registered sandbox business account (`PAYOUT_NOT_AVAILABLE`); use a US sandbox business account for payouts. Invoicing works from any country.
 - Payout webhooks are not reconciled yet (status comes from the create response).
 - Voice input uses the browser's Web Speech API (Chrome/Edge).
 
