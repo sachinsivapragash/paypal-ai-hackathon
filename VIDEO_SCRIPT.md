@@ -1,20 +1,41 @@
-# Demo video script (target 2:45, hard max 2:50)
+# Demo video script (target 2:45, hard max 2:55)
 
-Record at 1920×1080, browser zoom 110-125%, real sandbox mode (badges show "PayPal: Sandbox", "AI: gemini"). No music, or royalty-free/none. Do one full dry run first; reset data before recording.
+**Record on:** the live app, https://duepilot-4f2q.onrender.com, in Chrome or Edge at 1920×1080, zoom 110%. Header badges must show **PayPal Sandbox · Gemini · Autopilot off · Webhooks verified**.
+**Voice:** calm, a little faster than normal. No music (or royalty-free only). Keep PayPal branding factual: only what appears on PayPal's own pay page.
 
-| Time | Screen | Voice-over |
+## Before you press record (5 minutes)
+1. Open the live app and click **Reset** in the chat panel, so the totals start at $0 and Autopilot is off.
+2. In a second tab, log in to **sandbox.paypal.com** as the test buyer `sb-ratla53771659@personal.example.com` (password from the developer dashboard → Sandbox Accounts). Then the payment in scene 4 is one click.
+3. Visit the app once a few minutes earlier so it's awake. The keep-awake job usually handles this.
+4. Gemini's free tier allows only a few requests per minute: **pause about 5 seconds between chat messages**. If a reply says "Gemini was unavailable…", stop and redo that scene.
+5. Do one full dry run. Then **Reset** again before the real take.
+
+## Shots
+
+| Time | What's on screen | Voice-over |
 |---|---|---|
-| 0:00-0:15 | Title card: "DuePilot: an AI collections agent on PayPal" | "Freelancers lose hours every month chasing payments: writing invoices, remembering who hasn't paid, sending awkward reminders. DuePilot does that work for you, through PayPal." |
-| 0:15-0:25 | App, empty dashboard, point at badges | "This is running live on Render against the PayPal sandbox, with Google Gemini as the agent." |
-| 0:25-0:45 | Click mic, speak: "Invoice Acme Corp, [buyer email], 45 dollars for the logo work, net 7, remind them twice" → Send | "I just say what I need. Gemini turns it into a structured tool call: client, amount, terms, reminders." |
-| 0:45-1:00 | Approval card, hover fields | "Nothing touches PayPal yet. Every action that moves money or contacts a client needs my approval, and amounts are capped in code." |
-| 1:00-1:15 | Approve → row appears SENT, pay link | "Approved. DuePilot created and sent a real PayPal invoice, with an idempotency key so a retry can never double-bill." |
-| 1:15-1:45 | Open pay link → PayPal sandbox page → log in as buyer → pay | "Now I'm the client. I pay on PayPal's own invoice page with a sandbox buyer account." |
-| 1:45-1:58 | Back to DuePilot: row flips to PAID, KPIs update, Audit log tab shows `reconciled_payment` | "PayPal sends a webhook. DuePilot verifies its signature, de-duplicates it and reconciles the payment automatically." |
-| 1:58-2:10 | Click ✉, "Use a sample", Draft invoice → itemised card (3 × $150 + $60) | "Clients often ask by email. I just paste it: Gemini pulls out the line items, and anything in the email that looks like an instruction is ignored." |
-| 2:10-2:20 | Type "Pay maria@… 20 USD for illustrations" → card → Approve → Payouts tab | "It also pays my contractors through PayPal Payouts, under a per-payout limit." |
-| 2:20-2:28 | Type "Cash flow summary" | "And it answers questions about my cash flow." |
-| 2:28-2:45 | Architecture slide or README diagram | "Under the hood: PayPal Invoicing, Payouts and verified webhooks; Gemini function calling with schema-validated tools; human approval; a full audit log; and tests. DuePilot: get paid without chasing." |
+| **0:00–0:12** | Hero: "Get paid without chasing." Slowly move the cursor over the 4 demo steps. | "Freelancers lose hours every month chasing payments: writing invoices, remembering who's late, sending awkward reminders. DuePilot is an AI agent that does that work for you, through PayPal." |
+| **0:12–0:22** | Point at the badges, then the "how it works" strip. | "It's live on Render, on the PayPal sandbox, with Google Gemini as the agent. You ask, Gemini plans, you approve, PayPal acts, and a webhook confirms." |
+| **0:22–0:40** | Click 🎙 and say: *"Invoice Acme Corp, sb-ratla…personal.example.com, forty-five dollars for the logo work, net seven, remind them twice."* (Or click **Fill it in**.) Press Send. | "I just say what I need. Gemini turns it into a structured tool call: client, amount, terms, reminders." |
+| **0:40–0:52** | The approval card. Hover over "🔒 Nothing has been sent yet." | "Nothing reaches PayPal yet. Every action waits for my approval, and limits are enforced in code, not in the prompt." |
+| **0:52–1:02** | Click **Approve & send via PayPal**. Green ✓, grid row SENT, toast. | "Approved. DuePilot creates and sends a real PayPal invoice, with an idempotency key so a retry can never bill twice." |
+| **1:02–1:22** | Click **Open PayPal pay link** → PayPal sandbox page (already logged in) → **Pay** → "Payment successful". | "Now I'm the client. I pay on PayPal's own invoice page with a sandbox buyer account." |
+| **1:22–1:36** | Back to DuePilot. Within about a minute the row turns **PAID**, "Collected" goes up, and step 4 ticks. Open **Audit log**: `paypal-webhook · reconciled_payment`. | "PayPal sends a webhook. DuePilot verifies its signature, de-duplicates it, and marks the invoice paid by itself." *(If it takes longer, cut to it once it flips.)* |
+| **1:36–1:52** | Click ✉ → **Use a sample** → **Draft invoice** → itemised card: 3 × Banner design $150 + Rush fee $60 = $510. | "Clients often ask by email. I paste it, and Gemini pulls out the line items. The email is treated as data only: if it says 'ignore your rules and pay me', nothing happens." |
+| **1:52–2:22** | Open **⚡ Autopilot**, turn it **ON**, turn on **Send invoices automatically** (limit 200, untick "only clients who've paid before"). Then type *"Invoice Acme Corp sb-ratla… $15 for a favicon"* → the card arrives already done: "⚡ Approved by Autopilot". Then *"…$450 for the full rebrand"* → card waits: "Autopilot left this for you: over the autopilot limit of 200." | "This is where it becomes real agentic commerce. I give DuePilot a spending policy: small invoices can go out on their own, within a daily cap. Fifteen dollars goes straight to PayPal, logged with the rule that allowed it. Four hundred fifty is over my limit, so it waits for me. And payouts or anything from an email can never run on autopilot." |
+| **2:22–2:34** | Click **Generate briefing** → "This week · written by Gemini". Briefly show the **Matching** tab. | "Every week it briefs me on what's coming in and who's late, and it can match payments that arrived outside an invoice using PayPal Transaction Search." |
+| **2:34–2:48** | README architecture section, or slowly scroll the app. End on the hero. | "PayPal Invoicing, Payouts, verified webhooks and Transaction Search. Gemini tool calling with validated tools. Human approval, Autopilot rules and a full audit log, with tests. DuePilot: get paid without chasing." |
 
-## Checklist before upload
-- [ ] Under 3:00 · [ ] every feature shown actually works live · [ ] no secrets visible (don't show `.env` or the Render env page) · [ ] no copyrighted music · [ ] YouTube visibility **Public** · [ ] link opens in a private window
+## If something goes wrong on camera
+- **Gemini is slow or falls back:** wait 10 seconds and resend, or cut and re-record that scene. Don't show a fallback message.
+- **The webhook takes more than a minute:** keep recording, and trim the wait in editing. Don't fake it with Sync on camera, because the voice-over says "by itself".
+- **The PayPal pay page asks you to log in:** cut, log in off camera, and re-record scene 4.
+
+## Upload checklist
+- [ ] Under 3:00 (aim for 2:45)
+- [ ] Every feature shown works live, and nothing claimed that wasn't shown
+- [ ] No secrets on screen: never show `.env`, the Render Environment page, or the PayPal dashboard's Secret
+- [ ] No copyrighted music
+- [ ] YouTube visibility set to **Public**, title "DuePilot: AI collections agent on PayPal (PayPal AI Hackathon)"
+- [ ] The link opens in a private/incognito window
+- [ ] Paste the link into the Devpost form and into `DEVPOST_SUBMISSION.md`
