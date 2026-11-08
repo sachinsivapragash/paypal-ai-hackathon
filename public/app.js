@@ -36,6 +36,17 @@ function renderCard(p) {
     <dl>${cardFields(p).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <p class="safe">🔒 ${esc(SAFE[p.type] || 'Waiting for your approval.')}</p>
     <div class="actions"><button class="ok" data-act="approve">${esc(APPROVE[p.type] || 'Approve')}</button><button class="bad" data-act="reject">Reject</button></div>`;
+  const ap = p.autopilot;
+  if (ap && !ap.auto) el.querySelector('.safe').insertAdjacentHTML('afterend', `<p class="ap-note">⚡ Autopilot left this for you: ${esc(ap.reason)}.</p>`);
+  // Already executed by Autopilot: show it as done, with the rule that allowed it.
+  if (p.status === 'DONE' || p.status === 'FAILED') {
+    const res = p.result || {};
+    el.classList.add(p.status === 'DONE' ? 'done' : 'failed');
+    el.querySelector('.tag').textContent = p.status === 'DONE' ? (ap?.auto ? 'autopilot' : 'done') : 'failed';
+    el.querySelector('.safe').outerHTML = ap?.auto ? `<p class="ap-note auto">⚡ Approved by Autopilot: ${esc(ap.reason)}.</p>` : '';
+    if (p.status === 'DONE') el.querySelector('.actions').innerHTML = res.payLink ? `<a class="paylink" href="${esc(res.payLink)}" target="_blank" rel="noopener">Open PayPal pay link for #${esc(res.number)} ↗</a>` : '<span>Done ✓</span>';
+    else el.querySelector('.actions').insertAdjacentHTML('afterbegin', `<span class="muted">Failed: ${esc(p.error || '')}</span>`);
+  }
   el.addEventListener('click', async (e) => {
     const act = e.target.dataset?.act; if (!act) return;
     el.querySelectorAll('button').forEach((b) => (b.disabled = true));
@@ -96,6 +107,42 @@ function renderInvoices(inv) {
   }
   grid.setGridOption('rowData', inv);
 }
+
+// ---- Autopilot tab: standing rules the agent may act on without a click ----
+function renderAutopilot(a) {
+  if (!a) return;
+  const p = a.policy;
+  const on = (path, v) => `<input type="checkbox" data-ap="${path}" ${v ? 'checked' : ''} ${path !== 'enabled' && !p.enabled ? 'disabled' : ''}>`;
+  const pct = p.dailyLimit ? Math.min(100, Math.round((a.spentToday / p.dailyLimit) * 100)) : 0;
+  $('#pane-autopilot').innerHTML = `
+    <div class="ap-head">
+      <label class="switch big">${on('enabled', p.enabled)}<span></span></label>
+      <div><b>Autopilot is ${p.enabled ? 'ON' : 'OFF'}</b><small class="muted">${p.enabled ? 'DuePilot acts on its own inside these rules and logs every action with the rule that allowed it.' : 'Every action waits for your click. Turn on to let DuePilot handle routine work.'}</small></div>
+    </div>
+    <div class="ap-rules ${p.enabled ? '' : 'off'}">
+      <div class="ap-rule"><label class="switch">${on('invoices.enabled', p.invoices.enabled)}<span></span></label>
+        <div><b>Send invoices automatically</b><small class="muted">up to <input type="number" min="1" max="${a.hard?.maxInvoiceAmount || 1000}" step="1" data-ap-num="invoices.maxAmount" value="${p.invoices.maxAmount}" ${p.enabled ? '' : 'disabled'}> each
+          · <label><input type="checkbox" data-ap="invoices.knownClientsOnly" ${p.invoices.knownClientsOnly ? 'checked' : ''} ${p.enabled ? '' : 'disabled'}> only clients who've paid before</label></small></div></div>
+      <div class="ap-rule"><label class="switch">${on('reminders.enabled', p.reminders.enabled)}<span></span></label>
+        <div><b>Send reminders automatically</b><small class="muted">polite nudges for unpaid invoices</small></div></div>
+      <div class="ap-rule"><label class="switch">${on('matching.enabled', p.matching.enabled)}<span></span></label>
+        <div><b>Mark high-confidence payment matches as paid</b><small class="muted">amount + payer email must both match</small></div></div>
+      <div class="ap-rule"><span class="lock">🔒</span><div><b>Payouts and cancellations</b><small class="muted">always need you. This can't be switched off.</small></div></div>
+      <div class="ap-rule"><span class="lock">✉</span><div><b>Anything from a pasted email</b><small class="muted">always needs you (third-party text is never trusted to act).</small></div></div>
+      <div class="ap-cap"><div><b>Daily cap</b> <input type="number" min="0" max="${a.hard?.maxDailyLimit || 2000}" step="10" data-ap-num="dailyLimit" value="${p.dailyLimit}" ${p.enabled ? '' : 'disabled'}> <small class="muted">${fmt(a.spentToday)} invoiced by Autopilot today</small></div>
+        <div class="meter"><i style="width:${pct}%"></i></div></div>
+    </div>`;
+}
+async function saveAutopilot(patch) {
+  try { const r = await api('/api/autopilot', patch); setState(r.state); toast(r.policy.enabled ? 'Autopilot rules saved' : 'Autopilot is off'); }
+  catch (err) { toast(err.message); }
+}
+function setPath(obj, path, v) { const k = path.split('.'); const o = k.length > 1 ? { [k[0]]: { [k[1]]: v } } : { [k[0]]: v }; return Object.assign(obj, o); }
+$('#pane-autopilot').addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.ap) saveAutopilot(setPath({}, t.dataset.ap, t.checked));
+  if (t.dataset.apNum) saveAutopilot(setPath({}, t.dataset.apNum, Number(t.value)));
+});
 
 // Weekly briefing: numbers computed on the server, words written by Gemini (or a template).
 function renderBriefing(b) {
@@ -160,6 +207,8 @@ function render() {
   renderInsights(state.insights || []);
   renderMatching(state.reconcile);
   renderBriefing(state.briefing);
+  renderAutopilot(state.autopilot);
+  const apBadge = document.querySelector('#apBadge'); if (apBadge && state.autopilot) apBadge.innerHTML = `<i class="${state.autopilot.policy.enabled ? '' : 'off'}"></i>Autopilot <b>${state.autopilot.policy.enabled ? 'ON' : 'off'}</b>`;
 
   const pay = state.payouts;
   $('#pane-payouts').innerHTML = pay.length ? `<table><thead><tr><th>To</th><th class="num">Amount</th><th>For</th><th>Status</th><th>Batch</th></tr></thead><tbody>${pay.map((p) => `
@@ -295,6 +344,7 @@ render = function () { _render(); demoSteps(); };
     const dot = (on) => `<i class="${on ? '' : 'off'}"></i>`;
     $('#badges').innerHTML = `<span class="badge">${dot(true)}PayPal <b>${status.paypal === 'sandbox' ? 'Sandbox' : 'Demo simulator'}</b></span>
       <span class="badge">${dot(!/demo/.test(status.ai))}AI <b>${esc(status.ai.replace('gemini:', 'Gemini · '))}</b></span>
+      <span class="badge" id="apBadge"></span>
       <span class="badge">${dot(status.webhookVerification)}Webhooks <b>${status.webhookVerification ? 'verified' : status.paypal === 'sandbox' ? 'not set up' : 'simulated'}</b></span>`;
     if (status.paypal === 'demo') $('#seedBtn').classList.remove('hidden');
     setState(await api('/api/state'));

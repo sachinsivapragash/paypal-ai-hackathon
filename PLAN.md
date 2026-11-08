@@ -29,7 +29,7 @@ Gemini 3.5 Flash function calling (free tier), provider interface in `src/agent/
 
 - **Nov 8 (later)** ✅ Client risk insights + escalating reminder tone, AG Grid invoices grid (sponsor prize), demo sample data, time-saved KPI. 13 tests passing.
 
-- **Nov 8 (later)** ✅ Itemised invoices; paste-a-client-email intake with prompt-injection guardrails; PayPal Transaction Search matching + record-payment; AI weekly briefing. 27 tests. Feature freeze from here: polish + video only.
+- **Nov 8 (later)** ✅ Itemised invoices; paste-a-client-email intake with prompt-injection guardrails; PayPal Transaction Search matching + record-payment; AI weekly briefing; UI polish (hero + guided demo); Autopilot spending-policy rules. 32 tests. Feature freeze from here: polish + video only.
 
 ## Cut list (drop in this order if behind)
 1. Voice input

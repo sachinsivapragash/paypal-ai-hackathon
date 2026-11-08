@@ -7,6 +7,7 @@ const { summary, effectiveStatus, clientInsights, reminderMessage, timeSaved } =
 const { seedDemo } = require('./seed');
 const { matchPayments } = require('./reconcile');
 const { briefingFacts, writeBriefing } = require('./briefing');
+const { normalizePolicy, decide, autoSpentToday, HARD } = require('./autopilot');
 
 function createApp(config, { store = createStore(config.dataFile), paypal, provider } = {}) {
   paypal = paypal || createPayPal(config.paypal, { demo: config.paypalDemo });
@@ -25,6 +26,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     insights: clientInsights(store.db.invoices),
     reconcile: store.db.lastReconcile || null,
     briefing: store.db.lastBriefing || null,
+    autopilot: { policy: normalizePolicy(store.db.policy), spentToday: autoSpentToday(store.db.audit) },
   });
 
   // Search PayPal for incoming payments, match them to open invoices, and queue each match as an
@@ -67,7 +69,8 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     store.audit('user', 'chat', { message: msg.slice(0, 200) });
     const out = await runAgent(provider, msg, { store, config, asyncTools }, chatHistory);
     chatHistory = out.history.filter((h) => h.role !== 'tool' && !h.calls).slice(-8);
-    res.json({ reply: out.reply, proposals: out.proposals.map((id) => store.getPending(id)), state: view() });
+    await autopilot(out.proposals);
+    res.json({ reply: out.reply + autopilotNote(out.proposals), proposals: out.proposals.map((id) => store.getPending(id)), state: view() });
   }));
 
   // Paste a client's email -> agent drafts the invoice. The email is untrusted third-party text:
@@ -76,9 +79,10 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     const text = String(req.body?.email || '').trim();
     if (text.length < 10) return res.status(400).json({ error: 'Paste the client email first.' });
     store.audit('user', 'email_intake', { chars: text.length });
-    const out = await runAgent(provider, intakeMessage(text), { store, config, allowedTools: ['create_invoice', 'list_invoices', 'client_insights', 'cash_flow_summary'] }, chatHistory);
+    const out = await runAgent(provider, intakeMessage(text), { store, config, source: 'email', allowedTools: ['create_invoice', 'list_invoices', 'client_insights', 'cash_flow_summary'] }, chatHistory);
     chatHistory = out.history.filter((h) => h.role !== 'tool' && !h.calls).slice(-8);
-    res.json({ reply: out.reply, proposals: out.proposals.map((id) => store.getPending(id)), state: view() });
+    await autopilot(out.proposals);
+    res.json({ reply: out.reply + autopilotNote(out.proposals), proposals: out.proposals.map((id) => store.getPending(id)), state: view() });
   }));
 
   // ---- Human-in-the-loop approvals: the ONLY path that touches PayPal for writes ----
@@ -126,24 +130,57 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     throw new Error(`unknown action ${p.type}`);
   }
 
-  app.post('/api/actions/:id/approve', wrap(async (req, res) => {
-    const p = store.getPending(req.params.id);
-    if (!p) return res.status(404).json({ error: 'Action not found' });
-    if (p.status === 'DONE') return res.json({ ok: true, result: p.result, state: view(), duplicate: true });
-    if (p.status !== 'PENDING' && p.status !== 'FAILED') return res.status(409).json({ error: `Action is ${p.status}` });
+  // One approval path for humans AND Autopilot: same lock, same idempotency keys, same audit trail.
+  async function approve(p, actor, rule) {
     p.status = 'EXECUTING'; // lock synchronously so double clicks can't run it twice
     store.save();
     try {
       p.result = await execute(p);
       p.status = 'DONE';
-      store.audit('user', `approved_${p.type}`, { pendingId: p.id, ...p.result });
-      res.json({ ok: true, result: p.result, state: view() });
+      store.audit(actor, `approved_${p.type}`, { pendingId: p.id, amount: p.data?.amount, ...(rule ? { rule } : {}), ...p.result });
+      return p.result;
     } catch (e) {
       p.status = 'FAILED'; p.error = e.message;
       store.audit('system', `failed_${p.type}`, { pendingId: p.id, message: e.message });
-      res.status(502).json({ error: e.message, state: view() });
+      throw e;
     } finally { store.save(); }
+  }
+
+  app.post('/api/actions/:id/approve', wrap(async (req, res) => {
+    const p = store.getPending(req.params.id);
+    if (!p) return res.status(404).json({ error: 'Action not found' });
+    if (p.status === 'DONE') return res.json({ ok: true, result: p.result, state: view(), duplicate: true });
+    if (p.status !== 'PENDING' && p.status !== 'FAILED') return res.status(409).json({ error: `Action is ${p.status}` });
+    try { const result = await approve(p, 'user'); res.json({ ok: true, result, state: view() }); }
+    catch (e) { res.status(502).json({ error: e.message, state: view() }); }
   }));
+
+  // ---- Autopilot: run eligible proposals without a click, inside the user's rules ----
+  async function autopilot(ids) {
+    for (const id of ids) {
+      const p = store.getPending(id);
+      if (!p || p.status !== 'PENDING') continue;
+      const d = decide(p, { policy: store.db.policy, invoices: store.db.invoices, audit: store.db.audit });
+      if (!d.auto) { if (store.db.policy?.enabled) p.autopilot = { auto: false, reason: d.reason }; continue; }
+      p.autopilot = { auto: true, rule: d.rule, reason: d.reason };
+      try { await approve(p, 'autopilot', d.rule); } catch { /* failure is logged; card shows FAILED with a retry button */ }
+    }
+    store.save();
+  }
+  // Keeps the agent's reply honest when Autopilot already executed what the model called a draft.
+  function autopilotNote(ids) {
+    const done = ids.map((id) => store.getPending(id)).filter((p) => p?.autopilot?.auto && p.status === 'DONE');
+    if (!done.length) return '';
+    return '\n\n' + done.map((p) => `⚡ Autopilot already did this (${p.autopilot.reason})${p.result?.number ? `: invoice #${p.result.number} is on its way via PayPal` : ''}.`).join('\n');
+  }
+  app.get('/api/autopilot', (req, res) => res.json({ policy: normalizePolicy(store.db.policy), hard: HARD, spentToday: autoSpentToday(store.db.audit) }));
+  app.post('/api/autopilot', (req, res) => {
+    const before = normalizePolicy(store.db.policy);
+    store.db.policy = normalizePolicy(req.body || {}, before);
+    store.save();
+    store.audit('user', 'autopilot_rules_changed', { from: before, to: store.db.policy });
+    res.json({ policy: store.db.policy, hard: HARD, spentToday: autoSpentToday(store.db.audit), state: view() });
+  });
 
   app.post('/api/actions/:id/reject', (req, res) => {
     const p = store.getPending(req.params.id);
@@ -205,7 +242,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     res.json({ briefing: store.db.lastBriefing, state: view() });
   }));
 
-  app.post('/api/reconcile', wrap(async (req, res) => { const r = await reconcile(); res.json({ ...r, state: view() }); }));
+  app.post('/api/reconcile', wrap(async (req, res) => { const r = await reconcile(); await autopilot(r.suggestions.map((x) => x.pendingId)); res.json({ ...r, state: view() }); }));
 
   // ---- Scheduled reminders (approved up-front with the invoice) ----
   function firstReminder(inv) {
@@ -240,7 +277,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
   });
   app.post('/api/demo/seed', demoOnly, (req, res) => { seedDemo(store); res.json(view()); });
   app.get('/demo-pay/:paypalId', demoOnly, (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'demo-pay.html')));
-  app.post('/api/reset', (req, res) => { store.reset(); store.db.payouts = []; chatHistory = []; store.audit('user', 'reset', {}); res.json(view()); });
+  app.post('/api/reset', (req, res) => { store.reset(); store.db.policy = undefined; store.db.payouts = []; chatHistory = []; store.audit('user', 'reset', {}); res.json(view()); });
 
   app.locals = { store, runDueReminders, applyEvent };
   return app;

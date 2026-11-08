@@ -23,6 +23,18 @@ Freelancers and micro-businesses, especially solo workers billing international 
 | "Who should I chase first?" | Ranks clients by payment risk (average days to pay, late-payment rate, overdue balance). Automatic reminders get firmer, but stay polite, for higher-risk clients |
 | "Show unpaid invoices" / "Cash flow summary" | Read-only answers from your ledger |
 
+## ⚡ Autopilot: agentic commerce with a spending policy
+Turn on standing rules and DuePilot acts **without a click**, inside limits you set (the **Autopilot** tab):
+- **Send invoices automatically** up to an amount you choose (hard ceiling $1,000), optionally only for clients who have paid you before.
+- **Send reminders automatically.**
+- **Mark high-confidence payment matches as paid** (amount + payer email must both match).
+- **Daily cap** on the total value Autopilot may invoice per day (hard ceiling $2,000), shown as a meter.
+- **Never automatic, and not configurable:** payouts (money out), cancellations, and anything that came from a pasted email (untrusted third-party text).
+
+Rules are enforced in code (`src/autopilot.js`), not in the prompt. Autopilot uses the same approval function, idempotency keys and audit trail as a human click, and every auto-action is logged as `autopilot · approved_…` with the rule that allowed it. If Autopilot declines, the card says why (e.g. "over the autopilot limit of 200" or "new client"). It's off by default.
+
+Verified on the real PayPal sandbox: with a $200 limit, a $15 invoice was created and sent with no click (PayPal: SENT), while a $450 invoice waited for approval.
+
 ## Dashboard
 - **Invoices grid** built on AG Grid Community: sort, filter, resize, pay links and a per-row PayPal status sync.
 - **Client insights:** risk level, amount owed, average days to pay and late rate per client.

@@ -203,7 +203,7 @@ function publicInvoice(inv) {
 }
 
 // Executes a tool call from the model. Returns a JSON-able result for the model.
-function runTool(name, args, { store, config, allowedTools }) {
+function runTool(name, args, { store, config, allowedTools, source }) {
   if (allowedTools && !allowedTools.includes(name)) {
     store.audit('system', 'tool_blocked', { tool: name, reason: 'not allowed while processing a pasted email' });
     return { ok: false, errors: [`${name} is not allowed while processing a pasted client email`] };
@@ -212,7 +212,7 @@ function runTool(name, args, { store, config, allowedTools }) {
     case 'create_invoice': {
       const { errors, value } = validateInvoice(args || {}, config.maxInvoiceAmount);
       if (errors.length) return { ok: false, errors };
-      const p = store.addPending({ id: store.id('act'), type: 'create_invoice', status: 'PENDING', createdAt: new Date().toISOString(), data: value });
+      const p = store.addPending({ id: store.id('act'), type: 'create_invoice', status: 'PENDING', source: source || 'chat', createdAt: new Date().toISOString(), data: value });
       store.audit('agent', 'proposed_invoice', { pendingId: p.id, ...value });
       return { ok: true, pending_approval: p.id, preview: value, note: 'Shown to the user for approval. Not sent yet.' };
     }

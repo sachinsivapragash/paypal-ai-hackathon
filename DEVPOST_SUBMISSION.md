@@ -19,6 +19,7 @@ Freelancers and one-person businesses spend hours chasing payments: writing invo
 - **Auto-reconciliation:** PayPal's `INVOICING.INVOICE.PAID` webhook is signature-verified and de-duplicated, then the invoice flips to Paid and the cash-flow dashboard updates. A "Sync" button pulls status from PayPal as a fallback.
 - **Contractor payouts:** "Pay maria@studio.com 120 USD for illustrations" → approval → PayPal Payouts, with a hard per-payout cap.
 - **Cash-flow answers:** "Show unpaid invoices", "Cash flow summary".
+- **⚡ Autopilot (agentic commerce with a spending policy):** standing rules let the agent send small invoices, reminders and high-confidence payment matches without a click, within a per-invoice limit and a daily cap. Payouts, cancellations and anything from a pasted email can never be automated. Rules are enforced in code, and every auto-action is audit-logged with the rule that allowed it.
 - **Invoice from a pasted email:** paste a client's message and Gemini turns it into an itemised PayPal invoice card. The email is treated as untrusted data, and payout/cancel tools are blocked in code for that turn, so prompt injection in an email can't move money.
 - **Multi-line invoices:** "3 banners at $150 + $60 rush fee" becomes separate PayPal line items, and the total is recomputed in code.
 - **Payment matching with PayPal Transaction Search:** finds money that arrived outside an invoice link (e.g. a direct transfer), matches it to the right open invoice with explained reasons, and, after approval, records the payment on PayPal so the invoice is marked paid.
@@ -44,7 +45,7 @@ OAuth2 · Invoicing v2 (create, send, get, remind, cancel, record payment) · Tr
 - <If you used an AI coding assistant to help build the project, say so here, e.g. "Development was assisted by Claude Code.">
 
 ## Challenges we ran into
-Making an agent safe enough to touch money: we separated "propose" from "execute", enforced caps in code rather than in prompts, and designed idempotency keys so a retry after a network error never double-bills.
+Making an agent safe enough to touch money, and then safe enough to act on its own (Autopilot): we separated "propose" from "execute", enforced caps in code rather than in prompts, and designed idempotency keys so a retry after a network error never double-bills.
 
 ## Accomplishments that we're proud of
 A full loop (request → approval → PayPal invoice → client pays → verified webhook → reconciled dashboard) with tests covering the agent flow, guardrails, idempotent retries and webhook signature verification.
