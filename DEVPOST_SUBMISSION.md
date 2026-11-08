@@ -55,7 +55,7 @@ Multi-user accounts and Postgres; payout webhook reconciliation; WhatsApp/email 
 node.js, express, javascript, ag-grid, html, css, paypal-invoicing-api, paypal-payouts-api, paypal-webhooks, google-gemini, render
 
 ## Links
-- Live demo: <https://...onrender.com>
+- Live demo: https://duepilot-4f2q.onrender.com
 - Repo: https://github.com/sachinsivapragash/paypal-ai-hackathon
 - Video: <https://youtu.be/...>
 

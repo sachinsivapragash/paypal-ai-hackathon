@@ -2,7 +2,7 @@
 
 > Tell it who owes you money in plain English. DuePilot drafts the PayPal invoice, waits for your approval, sends it, chases payment with polite reminders, reconciles the payment from PayPal webhooks, and pays your contractors via PayPal Payouts, all under spending caps with a full audit log.
 
-**Live demo:** `https://<your-render-app>.onrender.com` (replace after deploying) · **Video:** `<YouTube link>` · **License:** MIT
+**Live demo:** https://duepilot-4f2q.onrender.com · **Video:** `<YouTube link>` · **License:** MIT
 
 ## The problem
 Freelancers and micro-businesses, especially solo workers billing international clients from places like India, lose hours every month on admin: writing invoices, remembering who hasn't paid, sending awkward follow-ups, and matching payments to invoices. Most stop chasing after one reminder. Late payment is a cash-flow problem, not an accounting problem.
@@ -78,14 +78,15 @@ Sandbox only: the server refuses to start if `PAYPAL_API_BASE` isn't a sandbox U
 Fork/push this repo → Render → **New → Blueprint** → select the repo (uses `render.yaml`) → fill the secret env vars in the dashboard. Note: the free plan's disk is ephemeral, so demo data resets on redeploy.
 
 ## Test access for judges
-- Hosted URL above. No login required.
+- Hosted URL above, no login required. Kept awake by a scheduled GitHub Action (`.github/workflows/keepalive.yml`) that pings it every 10 minutes, so judges don't hit the free tier's cold start.
+- Live PayPal webhook verified end to end: a sandbox buyer paid invoice #0004 and it switched to PAID automatically about 50 s later, with no manual sync.
 - PayPal sandbox buyer account for paying invoices: listed in the Devpost submission's testing instructions (sandbox-only, no real money).
 
 ## Environment variables
 See [`.env.example`](.env.example). Every key is optional; missing keys switch that part to demo mode.
 
 ## Limitations (honest)
-- Single-user demo: no auth, JSON-file storage. Production would need accounts and a real database.
+- Single-user demo: no auth, JSON-file storage. On Render's free plan the disk is ephemeral, so data resets when the service restarts or redeploys. Production would need accounts and a real database.
 - Use **US** sandbox accounts. PayPal blocks Payouts from India-registered accounts (`PAYOUT_NOT_AVAILABLE`) and payments between two India sandbox accounts.
 - New sandbox apps have **Invoicing** switched off: enable it under the app's *Features* and save (it can take a minute to apply).
 - Payout webhooks are not reconciled yet (status comes from the create response).
