@@ -6,6 +6,7 @@ const { createProvider, runAgent, intakeMessage } = require('./agent');
 const { summary, effectiveStatus, clientInsights, reminderMessage, timeSaved } = require('./agent/tools');
 const { seedDemo } = require('./seed');
 const { matchPayments } = require('./reconcile');
+const { briefingFacts, writeBriefing } = require('./briefing');
 
 function createApp(config, { store = createStore(config.dataFile), paypal, provider } = {}) {
   paypal = paypal || createPayPal(config.paypal, { demo: config.paypalDemo });
@@ -23,6 +24,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     summary: { ...summary(store.db.invoices), minutesSaved: timeSaved(store.db.audit) },
     insights: clientInsights(store.db.invoices),
     reconcile: store.db.lastReconcile || null,
+    briefing: store.db.lastBriefing || null,
   });
 
   // Search PayPal for incoming payments, match them to open invoices, and queue each match as an
@@ -191,6 +193,16 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
       store.audit('sync', 'status_updated', { number: inv.number, status: r.status });
     }
     res.json({ ok: true, state: view() });
+  }));
+
+  app.post('/api/briefing', wrap(async (req, res) => {
+    const facts = briefingFacts(store.db.invoices);
+    const ai = config.aiDemo ? {} : { apiKey: config.ai.geminiKey, model: config.ai.geminiModel, fallbackModel: config.ai.geminiFallbackModel };
+    const { text, by } = await writeBriefing(facts, ai);
+    store.db.lastBriefing = { ...facts, text, by };
+    store.save();
+    store.audit('agent', 'briefing_generated', { by, overdue: facts.overdue.length, dueThisWeek: facts.dueThisWeek.length });
+    res.json({ briefing: store.db.lastBriefing, state: view() });
   }));
 
   app.post('/api/reconcile', wrap(async (req, res) => { const r = await reconcile(); res.json({ ...r, state: view() }); }));

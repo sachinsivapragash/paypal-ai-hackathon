@@ -33,6 +33,11 @@ a { color: var(--accent); }
 .kpi.info strong { color: var(--accent); }
 .kpi.ok strong { color: var(--ok); } .kpi.warn strong { color: var(--warn); } .kpi.bad strong { color: var(--bad); }
 
+.briefing { margin: 0 24px 16px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 16px; display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.briefing .b-text { flex: 1 1 320px; font-size: 14px; }
+.briefing .b-text strong { display: block; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.briefing .b-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 900px) { .briefing { margin: 0 16px 16px; } }
 .grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(0, 1.4fr); gap: 16px; padding: 0 24px 16px; }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); display: flex; flex-direction: column; min-height: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); }

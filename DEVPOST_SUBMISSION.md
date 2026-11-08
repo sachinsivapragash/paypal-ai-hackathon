@@ -22,6 +22,7 @@ Freelancers and one-person businesses spend hours chasing payments: writing invo
 - **Invoice from a pasted email:** paste a client's message and Gemini turns it into an itemised PayPal invoice card. The email is treated as untrusted data, and payout/cancel tools are blocked in code for that turn, so prompt injection in an email can't move money.
 - **Multi-line invoices:** "3 banners at $150 + $60 rush fee" becomes separate PayPal line items, and the total is recomputed in code.
 - **Payment matching with PayPal Transaction Search:** finds money that arrived outside an invoice link (e.g. a direct transfer), matches it to the right open invoice with explained reasons, and, after approval, records the payment on PayPal so the invoice is marked paid.
+- **Weekly cash-flow briefing:** numbers are computed in code, and Gemini turns them into a 4-sentence summary with one-click next actions. It is only allowed to use the supplied figures.
 - **Client risk insights:** "Who should I chase first?" ranks clients by average days to pay, late-payment rate and overdue balance. Reminder tone escalates politely for higher-risk clients.
 - **Data grid** (AG Grid Community) for invoices: sort, filter, pay links, PayPal status sync.
 - **Estimated admin time saved** KPI, so the impact is visible.

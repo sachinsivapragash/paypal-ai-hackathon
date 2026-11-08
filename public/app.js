@@ -91,6 +91,25 @@ function renderInvoices(inv) {
   grid.setGridOption('rowData', inv);
 }
 
+// Weekly briefing: numbers computed on the server, words written by Gemini (or a template).
+function renderBriefing(b) {
+  if (!b) {
+    $('#briefing').innerHTML = `<div class="b-text"><strong>This week</strong>Get a 20-second summary of what's coming in, who's late and what to do next.</div><div class="b-actions"><button class="small" data-brief="1">Generate briefing</button></div>`;
+    return;
+  }
+  const acts = (b.actions || []).map((a, i) => `<button class="ghost small" data-act-i="${i}">${esc(a.label)}</button>`).join('');
+  $('#briefing').innerHTML = `<div class="b-text"><strong>This week · ${esc(b.by.startsWith('gemini') ? 'written by Gemini' : 'summary')}</strong>${esc(b.text)}</div>
+    <div class="b-actions">${acts}<button class="ghost small" data-brief="1" title="Regenerate">↻</button></div>`;
+}
+$('#briefing').addEventListener('click', async (e) => {
+  if (e.target.dataset?.brief) {
+    e.target.disabled = true; e.target.textContent = '…';
+    try { setState((await api('/api/briefing', {})).state); } catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = 'Generate briefing'; }
+  }
+  const i = e.target.dataset?.actI;
+  if (i != null) { $('#chatInput').value = state.briefing.actions[Number(i)].prompt; $('#chatInput').focus(); toast('Press Send when ready'); }
+});
+
 // Matching tab: PayPal Transaction Search results matched against open invoices.
 function renderMatching(r) {
   const head = `<div class="insight-lead"><button id="reconcileBtn" class="small">Check PayPal for payments</button>
@@ -134,6 +153,7 @@ function render() {
   renderInvoices(state.invoices);
   renderInsights(state.insights || []);
   renderMatching(state.reconcile);
+  renderBriefing(state.briefing);
 
   const pay = state.payouts;
   $('#pane-payouts').innerHTML = pay.length ? `<table><thead><tr><th>To</th><th class="num">Amount</th><th>For</th><th>Status</th><th>Batch</th></tr></thead><tbody>${pay.map((p) => `
