@@ -163,7 +163,7 @@ function greet() { addMsg(`Hi! I'm DuePilot. Tell me who to invoice or pay in pl
 (async function init() {
   try {
     status = await api('/api/status');
-    $('#badges').innerHTML = `<span class="badge">PayPal: <b>${status.paypal === 'sandbox' ? 'Sandbox' : 'Demo simulator'}</b></span><span class="badge">AI: <b>${esc(status.ai)}</b></span><span class="badge">Webhook signatures: <b>${status.webhookVerification ? 'verified' : 'n/a in demo'}</b></span>`;
+    $('#badges').innerHTML = `<span class="badge">PayPal: <b>${status.paypal === 'sandbox' ? 'Sandbox' : 'Demo simulator'}</b></span><span class="badge">AI: <b>${esc(status.ai)}</b></span><span class="badge">Webhook signatures: <b>${status.webhookVerification ? 'verified' : status.paypal === 'sandbox' ? 'not set up yet' : 'n/a in demo'}</b></span>`;
     if (status.paypal === 'demo') $('#seedBtn').classList.remove('hidden');
     setState(await api('/api/state'));
     state.pending.forEach(renderCard);
