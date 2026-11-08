@@ -53,7 +53,7 @@ node.js, express, javascript, html, css, paypal-invoicing-api, paypal-payouts-ap
 
 ## Links
 - Live demo: <https://...onrender.com>
-- Repo: <https://github.com/<you>/duepilot>
+- Repo: https://github.com/sachinsivapragash/paypal-ai-hackathon
 - Video: <https://youtu.be/...>
 
 ## Testing instructions for judges

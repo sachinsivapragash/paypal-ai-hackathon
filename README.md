@@ -48,7 +48,7 @@ Express server (src/app.js)
 ## Run it locally (2 minutes)
 Requires Node.js 20+.
 ```bash
-git clone https://github.com/<you>/duepilot.git && cd duepilot
+git clone https://github.com/sachinsivapragash/paypal-ai-hackathon.git && cd paypal-ai-hackathon
 npm run setup     # installs deps and creates .env from .env.example
 npm start         # http://localhost:3000
 ```
