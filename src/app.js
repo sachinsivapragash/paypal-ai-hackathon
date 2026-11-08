@@ -5,6 +5,7 @@ const { createPayPal } = require('./paypal');
 const { createProvider, runAgent, intakeMessage } = require('./agent');
 const { summary, effectiveStatus, clientInsights, reminderMessage, timeSaved } = require('./agent/tools');
 const { seedDemo } = require('./seed');
+const { matchPayments } = require('./reconcile');
 
 function createApp(config, { store = createStore(config.dataFile), paypal, provider } = {}) {
   paypal = paypal || createPayPal(config.paypal, { demo: config.paypalDemo });
@@ -21,7 +22,31 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     audit: store.db.audit.slice(0, 100),
     summary: { ...summary(store.db.invoices), minutesSaved: timeSaved(store.db.audit) },
     insights: clientInsights(store.db.invoices),
+    reconcile: store.db.lastReconcile || null,
   });
+
+  // Search PayPal for incoming payments, match them to open invoices, and queue each match as an
+  // approval card ("record payment"). Nothing is marked paid without a human click.
+  async function reconcile() {
+    const { transactions, lastRefreshed } = await paypal.searchTransactions(30);
+    const busy = store.db.pending.filter((p) => p.type === 'record_payment' && ['PENDING', 'DONE', 'EXECUTING'].includes(p.status)).map((p) => p.data.transactionId);
+    const result = matchPayments(transactions, store.db.invoices, { alreadyMatched: busy });
+    const suggestions = result.suggestions.map((s) => {
+      const p = store.addPending({ id: store.id('act'), type: 'record_payment', status: 'PENDING', createdAt: new Date().toISOString(),
+        data: { invoiceId: s.invoiceId, number: s.number, clientName: s.clientName, transactionId: s.transaction.id, amount: s.transaction.amount, currency: s.transaction.currency, date: s.transaction.date, payer: s.transaction.payerEmail || s.transaction.payerName, confidence: s.confidence, reasons: s.reasons } });
+      return { ...s, pendingId: p.id };
+    });
+    store.db.lastReconcile = { at: new Date().toISOString(), lastRefreshed, scanned: result.scanned, suggestions, unmatched: result.unmatched };
+    store.save();
+    store.audit('agent', 'reconciled_transactions', { scanned: result.scanned, suggested: suggestions.length, unmatched: result.unmatched.length });
+    return store.db.lastReconcile;
+  }
+  const asyncTools = { reconcile_payments: async () => {
+    const r = await reconcile();
+    return { ok: true, scanned: r.scanned, data_refreshed_at: r.lastRefreshed,
+      suggestions: r.suggestions.map((s) => ({ pending_approval: s.pendingId, invoice: s.number, client: s.clientName, amount: s.transaction.amount, confidence: s.confidence, reasons: s.reasons })),
+      unmatched: r.unmatched.map((u) => ({ amount: u.amount, payer: u.payerEmail || u.payerName, date: u.date })) };
+  } };
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => {
     store.audit('system', 'error', { route: req.path, message: e.message });
@@ -38,7 +63,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     const msg = String(req.body?.message || '').trim();
     if (!msg) return res.status(400).json({ error: 'Type a request first.' });
     store.audit('user', 'chat', { message: msg.slice(0, 200) });
-    const out = await runAgent(provider, msg, { store, config }, chatHistory);
+    const out = await runAgent(provider, msg, { store, config, asyncTools }, chatHistory);
     chatHistory = out.history.filter((h) => h.role !== 'tool' && !h.calls).slice(-8);
     res.json({ reply: out.reply, proposals: out.proposals.map((id) => store.getPending(id)), state: view() });
   }));
@@ -80,6 +105,14 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
       await paypal.cancelInvoice(inv.paypalId, key('cancel'));
       store.upsertInvoice({ id: inv.id, status: 'CANCELLED', remindersLeft: 0 });
       return { number: inv.number };
+    }
+    if (p.type === 'record_payment') {
+      const inv = store.db.invoices.find((i) => i.id === d.invoiceId);
+      if (!inv) throw new Error('Invoice no longer exists');
+      if (inv.status === 'PAID') return { number: inv.number, note: 'already paid' };
+      await paypal.recordPayment(inv.paypalId, d, key('record'));
+      store.upsertInvoice({ id: inv.id, status: 'PAID', paidAt: new Date(d.date + 'T12:00:00Z').toISOString(), remindersLeft: 0, matchedTransaction: d.transactionId });
+      return { number: inv.number, transactionId: d.transactionId };
     }
     if (p.type === 'pay_contractor') {
       const r = await paypal.createPayout(d, key('payout'));
@@ -159,6 +192,8 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     }
     res.json({ ok: true, state: view() });
   }));
+
+  app.post('/api/reconcile', wrap(async (req, res) => { const r = await reconcile(); res.json({ ...r, state: view() }); }));
 
   // ---- Scheduled reminders (approved up-front with the invoice) ----
   function firstReminder(inv) {

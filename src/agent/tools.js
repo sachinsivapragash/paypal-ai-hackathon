@@ -72,6 +72,11 @@ const declarations = [
     parameters: { type: 'object', properties: { status: { type: 'string' } } },
   },
   {
+    name: 'reconcile_payments',
+    description: 'Search PayPal transactions from the last 30 days and match incoming payments that were not made through an invoice link (e.g. a client who paid by direct transfer) to open invoices. Each match becomes an approval card; nothing is marked paid automatically.',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
     name: 'client_insights',
     description: 'Per-client payment behaviour: average days to pay, late-payment rate, amount owed and a risk level (low/medium/high). Use it to decide who to chase first and how firmly.',
     parameters: { type: 'object', properties: {} },

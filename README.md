@@ -18,6 +18,7 @@ Freelancers and micro-businesses, especially solo workers billing international 
 | "Pay maria@studio.com 120 USD for illustrations" | Approval + cap check, then PayPal Payouts (`POST /v1/payments/payouts`) |
 | ✉ *Paste a client's email*: "Could you send the bill for the 3 banner designs at $150 each, plus the $60 rush fee?" | Gemini extracts the sender, the work and the prices into an **itemised** invoice card (3 × $150 + 1 × $60 = $510). The email is handled as untrusted data, and payout/cancel tools are blocked in code for that turn, so a malicious email can't move money |
 | "Logo $300 plus 2 revision rounds at $50" | Multi-line PayPal invoice; the total is recomputed in code from the items, never taken from the model |
+| "Did anyone pay me outside an invoice?" (or **Matching → Check PayPal for payments**) | Pulls the last 30 days from **PayPal Transaction Search** (`GET /v1/reporting/transactions`), matches incoming payments to open invoices using amount, payer email/domain, name and note, and explains *why*. Each match is an approval card. Approving records the payment on PayPal (`POST /v2/invoicing/invoices/{id}/payments`) and marks the invoice paid. A payment from a stranger that only matches on amount is **not** matched. |
 | "Who should I chase first?" | Ranks clients by payment risk (average days to pay, late-payment rate, overdue balance). Automatic reminders get firmer, but stay polite, for higher-risk clients |
 | "Show unpaid invoices" / "Cash flow summary" | Read-only answers from your ledger |
 
@@ -92,6 +93,7 @@ See [`.env.example`](.env.example). Every key is optional; missing keys switch t
 - Single-user demo: no auth, JSON-file storage. On Render's free plan the disk is ephemeral, so data resets when the service restarts or redeploys. Production would need accounts and a real database.
 - Use **US** sandbox accounts. PayPal blocks Payouts from India-registered accounts (`PAYOUT_NOT_AVAILABLE`) and payments between two India sandbox accounts.
 - New sandbox apps have **Invoicing** switched off: enable it under the app's *Features* and save (it can take a minute to apply).
+- PayPal's Transaction Search data is refreshed periodically (the response includes `last_refreshed_datetime`), so payments from the last few hours may not appear yet. DuePilot shows that timestamp, and the agent mentions it.
 - Payout webhooks are not reconciled yet (status comes from the create response).
 - Voice input uses the browser's Web Speech API (Chrome/Edge).
 

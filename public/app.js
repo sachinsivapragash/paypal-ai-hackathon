@@ -14,12 +14,13 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 
 function addMsg(text, cls) { const d = document.createElement('div'); d.className = `msg ${cls}`; d.textContent = text; $('#messages').append(d); d.scrollIntoView({ block: 'end' }); return d; }
 
-const LABEL = { create_invoice: 'Send PayPal invoice', send_reminder: 'Send reminder', cancel_invoice: 'Cancel invoice', pay_contractor: 'PayPal payout' };
+const LABEL = { create_invoice: 'Send PayPal invoice', send_reminder: 'Send reminder', cancel_invoice: 'Cancel invoice', pay_contractor: 'PayPal payout', record_payment: 'Match payment to invoice' };
 function cardFields(p) {
   const d = p.data;
   if (p.type === 'create_invoice') return [['Client', d.clientName], ['Email', d.clientEmail], ['For', d.description],
     ...(d.items?.length ? d.items.map((it, i) => [i ? '' : 'Items', `${it.quantity} × ${it.name} @ ${fmt(it.unitAmount, d.currency)}`]) : []),
     ['Total', fmt(d.amount, d.currency)], ['Terms', `Net ${d.netDays}`], ['Auto reminders', d.reminders]];
+  if (p.type === 'record_payment') return [['Payment', `${fmt(d.amount, d.currency)} from ${d.payer || 'unknown'} on ${d.date}`], ['Invoice', `#${d.number} · ${d.clientName}`], ['Confidence', d.confidence], ['Why', d.reasons.join(', ')], ['PayPal txn', d.transactionId]];
   if (p.type === 'pay_contractor') return [['To', d.recipientEmail], ['Amount', fmt(d.amount, d.currency)], ['For', d.note]];
   if (p.type === 'send_reminder') return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)], ['Message', d.message]];
   return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)]];
@@ -90,6 +91,33 @@ function renderInvoices(inv) {
   grid.setGridOption('rowData', inv);
 }
 
+// Matching tab: PayPal Transaction Search results matched against open invoices.
+function renderMatching(r) {
+  const head = `<div class="insight-lead"><button id="reconcileBtn" class="small">Check PayPal for payments</button>
+    <span class="muted" style="margin-left:8px">Finds money that arrived outside an invoice link and suggests which invoice it pays.</span></div>`;
+  if (!r) { $('#pane-matching').innerHTML = head + '<div class="empty"><strong>Not checked yet</strong>Click the button, or ask "Did anyone pay me outside an invoice?"</div>'; return; }
+  const pend = new Set(state.pending.map((p) => p.id));
+  const sug = r.suggestions.map((s) => `<tr><td>${fmt(s.transaction.amount, s.transaction.currency)}</td><td>${esc(s.transaction.payerEmail || s.transaction.payerName || '')}</td><td>#${esc(s.number)} · ${esc(s.clientName)}</td>
+    <td><span class="risk risk-${s.confidence === 'high' ? 'low' : 'medium'}">${esc(s.confidence)}</span><br><small class="muted">${esc(s.reasons.join(', '))}</small></td>
+    <td>${pend.has(s.pendingId) ? `<button class="ok small" data-match="${esc(s.pendingId)}">Approve</button>` : '<span class="muted">handled</span>'}</td></tr>`).join('');
+  const un = r.unmatched.map((u) => `<tr><td>${fmt(u.amount, u.currency)}</td><td>${esc(u.payerEmail || u.payerName || 'unknown')}</td><td colspan="3" class="muted">${u.closest ? `Closest: #${esc(u.closest.number)} (${esc(u.closest.reasons.join(', '))}), not confident enough` : 'No matching invoice'}${u.note ? ` · note: “${esc(u.note)}”` : ''}</td></tr>`).join('');
+  $('#pane-matching').innerHTML = head + `<div class="insight-lead muted">Checked ${r.scanned} incoming payment(s) at ${new Date(r.at).toLocaleTimeString()}${r.lastRefreshed ? ` · PayPal data as of ${new Date(r.lastRefreshed).toLocaleString()}` : ''}</div>
+    <table><thead><tr><th>Payment</th><th>From</th><th>Invoice</th><th>Match</th><th></th></tr></thead><tbody>${sug || '<tr><td colspan="5" class="muted">No new matches.</td></tr>'}${un}</tbody></table>`;
+}
+$('#pane-matching').addEventListener('click', async (e) => {
+  if (e.target.id === 'reconcileBtn') {
+    e.target.disabled = true; e.target.textContent = 'Checking PayPal…';
+    try { const r = await api('/api/reconcile', {}); setState(r.state); toast(`${r.suggestions.length} match(es), ${r.unmatched.length} unmatched`); }
+    catch (err) { toast(err.message); e.target.disabled = false; e.target.textContent = 'Check PayPal for payments'; }
+  }
+  const id = e.target.dataset?.match;
+  if (id) {
+    e.target.disabled = true;
+    try { const r = await api(`/api/actions/${id}/approve`, {}); setState(r.state); toast(`Invoice #${r.result.number} marked paid on PayPal`); document.querySelector(`.card[data-id="${id}"]`)?.remove(); }
+    catch (err) { toast(err.message); e.target.disabled = false; }
+  }
+});
+
 function renderInsights(list) {
   if (!list.length) { $('#pane-insights').innerHTML = '<div class="empty"><strong>No payment history yet</strong>Insights appear once clients have been invoiced. Ask "Who should I chase first?"</div>'; return; }
   const chase = list.find((c) => c.open > 0);
@@ -105,6 +133,7 @@ function render() {
 
   renderInvoices(state.invoices);
   renderInsights(state.insights || []);
+  renderMatching(state.reconcile);
 
   const pay = state.payouts;
   $('#pane-payouts').innerHTML = pay.length ? `<table><thead><tr><th>To</th><th class="num">Amount</th><th>For</th><th>Status</th><th>Batch</th></tr></thead><tbody>${pay.map((p) => `
@@ -160,7 +189,7 @@ $('#emailForm').addEventListener('submit', async (e) => {
 
 $('#seedBtn').addEventListener('click', async () => { try { setState(await api('/api/demo/seed', {})); toast('Loaded sample clients and payment history'); } catch (err) { toast(err.message); } });
 
-const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Who should I chase first?', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
+const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Who should I chase first?', 'Did anyone pay me outside an invoice?', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
 $('#chips').innerHTML = CHIPS.map((c) => `<button class="chip" type="button">${esc(c.length > 34 ? c.slice(0, 32) + '…' : c)}</button>`).join('');
 $('#chips').querySelectorAll('.chip').forEach((b, i) => b.addEventListener('click', () => { $('#chatInput').value = CHIPS[i]; $('#chatInput').focus(); }));
 

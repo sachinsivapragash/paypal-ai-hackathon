@@ -7,7 +7,25 @@ class PayPalError extends Error {
   constructor(message, status, body) { super(message); this.status = status; this.body = body; }
 }
 
-function createPayPal(cfg, { fetchImpl = globalThis.fetch, demo = false } = {}) {
+// Flattens a Transaction Search record into the fields DuePilot needs for matching.
+function normalizeTxn(t) {
+  const i = t.transaction_info || {};
+  const p = t.payer_info || {};
+  return {
+    id: i.transaction_id,
+    date: (i.transaction_initiation_date || '').slice(0, 10),
+    amount: Number(i.transaction_amount?.value || 0),
+    currency: i.transaction_amount?.currency_code || 'USD',
+    status: i.transaction_status, // S = success, P = pending, D = denied, V = reversed
+    eventCode: i.transaction_event_code,
+    invoiceId: i.invoice_id || null,
+    payerEmail: (p.email_address || '').toLowerCase() || null,
+    payerName: [p.payer_name?.given_name, p.payer_name?.surname].filter(Boolean).join(' ') || p.payer_name?.alternate_full_name || null,
+    note: i.transaction_note || i.transaction_subject || null,
+  };
+}
+
+function createPayPal(cfg,{ fetchImpl = globalThis.fetch, demo = false } = {}) {
   let token = null;
   let tokenExp = 0;
 
@@ -80,6 +98,30 @@ function createPayPal(cfg, { fetchImpl = globalThis.fetch, demo = false } = {}) 
       const inv = await call('GET', `/v2/invoicing/invoices/${paypalId}`);
       return { status: inv.status, payLink: inv.detail?.metadata?.recipient_view_url };
     },
+    // Transaction Search (reporting API). Note: PayPal refreshes this data periodically, so very
+    // recent payments can take a few hours to appear (see last_refreshed_datetime).
+    async searchTransactions(days = 30) {
+      const fmt = (d) => d.toISOString().replace(/\.\d+Z$/, '-0000');
+      const end = new Date();
+      const start = new Date(end.getTime() - Math.min(days, 31) * 86400000);
+      const out = [];
+      let lastRefreshed = null;
+      for (let page = 1; page <= 5; page++) {
+        const r = await call('GET', `/v1/reporting/transactions?start_date=${encodeURIComponent(fmt(start))}&end_date=${encodeURIComponent(fmt(end))}&fields=all&page_size=100&page=${page}`);
+        lastRefreshed = r.last_refreshed_datetime || lastRefreshed;
+        for (const t of r.transaction_details || []) out.push(normalizeTxn(t));
+        if (!r.total_pages || page >= r.total_pages) break;
+      }
+      return { transactions: out, lastRefreshed };
+    },
+    // Records a payment received outside the invoice flow, which marks the PayPal invoice paid.
+    async recordPayment(paypalId, p, key) {
+      await call('POST', `/v2/invoicing/invoices/${paypalId}/payments`, {
+        method: 'PAYPAL', payment_date: p.date, amount: { currency_code: p.currency, value: Number(p.amount).toFixed(2) },
+        note: `Matched by DuePilot to PayPal transaction ${p.transactionId}`,
+      }, { idempotencyKey: key });
+      return { status: 'PAID' };
+    },
     // Payouts API: sender_batch_id doubles as an idempotency key on PayPal's side.
     async createPayout(p, key) {
       const r = await call('POST', '/v1/payments/payouts', {
@@ -125,6 +167,19 @@ function createPayPal(cfg, { fetchImpl = globalThis.fetch, demo = false } = {}) 
     async remindInvoice() { return { ok: true }; },
     async cancelInvoice(paypalId) { sim.invoices.set(paypalId, { status: 'CANCELLED' }); return { status: 'CANCELLED' }; },
     async getInvoice(paypalId) { return { status: sim.invoices.get(paypalId)?.status || 'SENT', payLink: `/demo-pay/${paypalId}` }; },
+    // Demo: incoming payments that were NOT made through an invoice link, for matching.
+    async searchTransactions() {
+      const d = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+      return {
+        lastRefreshed: new Date().toISOString(),
+        transactions: [
+          { id: 'DEMO-TXN-7NW1', date: d(1), amount: 280, currency: 'USD', status: 'S', eventCode: 'T0000', invoiceId: null, payerEmail: 'owner@northwind.example.com', payerName: 'Northwind Cafe', note: 'photo edits' },
+          { id: 'DEMO-TXN-4OR2', date: d(2), amount: 450, currency: 'USD', status: 'S', eventCode: 'T0000', invoiceId: null, payerEmail: 'payments@orchid-events.example.com', payerName: 'Orchid Events', note: 'posters' },
+          { id: 'DEMO-TXN-9ZZ3', date: d(3), amount: 75, currency: 'USD', status: 'S', eventCode: 'T0000', invoiceId: null, payerEmail: 'sam@unknown.example.com', payerName: 'Sam Rivera', note: 'thanks!' },
+        ],
+      };
+    },
+    async recordPayment(paypalId) { sim.invoices.set(paypalId, { status: 'PAID' }); return { status: 'PAID' }; },
     async createPayout(p, key) { return once(key, () => ({ batchId: `DEMOBATCH${crypto.randomBytes(4).toString('hex').toUpperCase()}`, status: 'SUCCESS' })); },
     async verifyWebhook() { return false; }, // demo payments go through /api/demo/pay, never the public webhook
   };
@@ -132,4 +187,4 @@ function createPayPal(cfg, { fetchImpl = globalThis.fetch, demo = false } = {}) 
   return demo ? fake : real;
 }
 
-module.exports = { createPayPal, PayPalError };
+module.exports = { createPayPal, PayPalError, normalizeTxn };

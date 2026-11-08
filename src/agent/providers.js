@@ -52,6 +52,7 @@ function demo() {
   function parse(text) {
     const t = text.trim();
     const lower = t.toLowerCase();
+    if (/\b(reconcile|match (?:the |my )?payments?|pa(?:y|id) (?:me )?outside|anyone pa(?:y|id)|who paid|unmatched payments?|transaction search)\b/.test(lower)) return [{ name: 'reconcile_payments', args: {} }];
     const intake = t.match(/<client_email>([\s\S]*)<\/client_email>/i);
     if (intake) return parseEmail(intake[1]);
     const isInvoiceRequest = /^(please\s+)?(invoice|bill|charge)\b/.test(lower);
@@ -121,6 +122,11 @@ function demo() {
       const chase = r.clients.filter((c) => c.open > 0);
       const lines = r.clients.map((c) => `• ${c.client}: ${c.risk} risk · owes ${c.owed} · avg ${c.avgDaysToPay ?? 'n/a'} days to pay · ${c.lateRate}% late`);
       return (chase.length ? `Chase ${chase[0].client} first (${chase[0].risk} risk, owes ${chase[0].owed}).\n` : 'Nobody owes you right now.\n') + lines.join('\n');
+    }
+    if (name === 'reconcile_payments') {
+      const s = r.suggestions.map((x) => `• ${x.amount} from ${x.client} → invoice #${x.invoice} (${x.confidence}: ${x.reasons.join(', ')})`);
+      const u = r.unmatched.map((x) => `• ${x.amount} from ${x.payer || 'unknown'} on ${x.date}: no matching invoice`);
+      return `I checked ${r.scanned} incoming PayPal payment(s).` + (s.length ? `\nPossible matches (approve to mark paid):\n${s.join('\n')}` : '\nNo new matches.') + (u.length ? `\nUnmatched:\n${u.join('\n')}` : '');
     }
     if (name === 'pay_contractor') return `Payout ready: ${r.preview.amount} ${r.preview.currency} to ${r.preview.recipientEmail} for "${r.preview.note}". No money moves until you approve.`;
     if (name === 'cancel_invoice') return `Ready to cancel invoice #${r.preview.number} for ${r.preview.clientName}. Approve to confirm.`;
