@@ -1,0 +1,19 @@
+# Keeps the free Render instance awake for judges (free web services sleep after 15 idle minutes).
+# GitHub may delay scheduled runs by a few minutes; every 10 minutes keeps it well inside the window.
+name: Keep demo awake
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping health endpoint
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -m 90 https://duepilot-4f2q.onrender.com/api/status) && echo "HTTP $code" && [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "Demo did not answer with 200"; exit 1
