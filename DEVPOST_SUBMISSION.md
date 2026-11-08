@@ -19,6 +19,9 @@ Freelancers and one-person businesses spend hours chasing payments: writing invo
 - **Auto-reconciliation:** PayPal's `INVOICING.INVOICE.PAID` webhook is signature-verified and de-duplicated, then the invoice flips to Paid and the cash-flow dashboard updates. A "Sync" button pulls status from PayPal as a fallback.
 - **Contractor payouts:** "Pay maria@studio.com 120 USD for illustrations" → approval → PayPal Payouts, with a hard per-payout cap.
 - **Cash-flow answers:** "Show unpaid invoices", "Cash flow summary".
+- **Client risk insights:** "Who should I chase first?" ranks clients by average days to pay, late-payment rate and overdue balance. Reminder tone escalates politely for higher-risk clients.
+- **Data grid** (AG Grid Community) for invoices: sort, filter, pay links, PayPal status sync.
+- **Estimated admin time saved** KPI, so the impact is visible.
 - **Audit log** of every proposal, approval, PayPal call, webhook and error.
 - **Voice input** and a responsive UI that works on phones.
 - **Keyless demo mode** so anyone can try every flow instantly.
@@ -30,7 +33,7 @@ Node.js + Express backend, vanilla JS frontend, JSON-file store. The agent loop 
 OAuth2 · Invoicing v2 (create, send, get, remind, cancel) · Payouts · Webhooks (verify-webhook-signature; `INVOICING.INVOICE.PAID`, `INVOICING.INVOICE.CANCELLED`). Sandbox only.
 
 ## AI tools used and exactly how
-- **Google Gemini 2.5 Flash** via the Generative Language REST API with **function calling**. It (1) turns free-text requests into structured tool calls (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `cash_flow_summary`), (2) writes reminder messages, and (3) summarizes tool results for the user.
+- **Google Gemini 2.5 Flash** via the Generative Language REST API with **function calling**. It (1) turns free-text requests into structured tool calls (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `client_insights`, `cash_flow_summary`), (2) writes reminder messages, and (3) summarizes tool results for the user.
 - **Guardrails outside the model:** all tool arguments are schema-validated in code (email, amount > 0, currency whitelist, terms 0-90 days, ≤3 reminders, invoice cap 5,000, payout cap 500); invalid calls are returned to the model as errors.
 - **Provider-agnostic:** a one-method provider interface; a keyless deterministic demo provider emits the same tool calls when no API key is set (shown as "AI: demo" in the UI).
 - Browser **Web Speech API** for voice input.
@@ -49,7 +52,7 @@ PayPal's Invoicing, Payouts and Webhooks APIs; how to design tool-calling agents
 Multi-user accounts and Postgres; payout webhook reconciliation; WhatsApp/email intake; smarter reminder timing based on each client's payment history; multi-currency cash-flow forecasting.
 
 ## Built with
-node.js, express, javascript, html, css, paypal-invoicing-api, paypal-payouts-api, paypal-webhooks, google-gemini, render
+node.js, express, javascript, ag-grid, html, css, paypal-invoicing-api, paypal-payouts-api, paypal-webhooks, google-gemini, render
 
 ## Links
 - Live demo: <https://...onrender.com>
@@ -64,5 +67,5 @@ node.js, express, javascript, html, css, paypal-invoicing-api, paypal-payouts-ap
    - Email: `<sandbox personal account email>`
    - Password: `<sandbox personal account password>` (sandbox only, no real money)
 5. Return to DuePilot. Within seconds the invoice shows **PAID** (verified webhook). See the Audit log tab.
-6. Try: `Remind Acme`, `Pay <another sandbox email> 20 USD for illustrations`, `Cash flow summary`.
+6. Try: `Who should I chase first?`, `Remind Acme`, `Pay <another sandbox email> 20 USD for illustrations`, `Cash flow summary`.
 7. To run locally with no keys: `npm run setup && npm start` (demo mode).

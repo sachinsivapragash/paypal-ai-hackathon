@@ -3,7 +3,8 @@ const path = require('path');
 const { createStore } = require('./store');
 const { createPayPal } = require('./paypal');
 const { createProvider, runAgent } = require('./agent');
-const { summary, effectiveStatus } = require('./agent/tools');
+const { summary, effectiveStatus, clientInsights, reminderMessage, timeSaved } = require('./agent/tools');
+const { seedDemo } = require('./seed');
 
 function createApp(config, { store = createStore(config.dataFile), paypal, provider } = {}) {
   paypal = paypal || createPayPal(config.paypal, { demo: config.paypalDemo });
@@ -18,7 +19,8 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     payouts: store.db.payouts || [],
     pending: store.db.pending.filter((p) => p.status === 'PENDING'),
     audit: store.db.audit.slice(0, 100),
-    summary: summary(store.db.invoices),
+    summary: { ...summary(store.db.invoices), minutesSaved: timeSaved(store.db.audit) },
+    insights: clientInsights(store.db.invoices),
   });
 
   const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => {
@@ -154,14 +156,13 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
   }
   async function runDueReminders(now = Date.now(), { force = false } = {}) {
     const sent = [];
+    const risk = Object.fromEntries(clientInsights(store.db.invoices, now).map((c) => [c.client, c.risk]));
     for (const inv of store.db.invoices) {
       const st = effectiveStatus(inv, now);
       if (!['SENT', 'OVERDUE'].includes(st) || !inv.remindersLeft) continue;
       if (!force && (!inv.nextReminderAt || new Date(inv.nextReminderAt).getTime() > now)) continue;
       const n = (inv.remindersSent || 0) + 1;
-      const msg = st === 'OVERDUE'
-        ? `Hi ${inv.clientName}, invoice #${inv.number} (${inv.amount} ${inv.currency}) is now past due. If payment is already on its way, thank you! Otherwise you can pay in a couple of clicks with the link in this email.`
-        : `Hi ${inv.clientName}, a friendly heads-up that invoice #${inv.number} for ${inv.amount} ${inv.currency} is due on ${inv.dueDate}. Thank you!`;
+      const msg = reminderMessage(inv, n, risk[inv.clientName], st === 'OVERDUE');
       try {
         await paypal.remindInvoice(inv.paypalId, msg, `duepilot-${inv.id}-auto-${n}`);
         store.upsertInvoice({ id: inv.id, remindersLeft: inv.remindersLeft - 1, remindersSent: n, lastReminderAt: new Date(now).toISOString(), nextReminderAt: new Date(now + 3 * 86400000).toISOString() });
@@ -179,6 +180,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     const out = applyEvent({ id: `WH-DEMO-${Date.now()}`, event_type: 'INVOICING.INVOICE.PAID', resource: { invoice: { id: req.params.paypalId } } }, 'demo-webhook');
     res.json({ ...out, state: view() });
   });
+  app.post('/api/demo/seed', demoOnly, (req, res) => { seedDemo(store); res.json(view()); });
   app.get('/demo-pay/:paypalId', demoOnly, (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'demo-pay.html')));
   app.post('/api/reset', (req, res) => { store.reset(); store.db.payouts = []; chatHistory = []; store.audit('user', 'reset', {}); res.json(view()); });
 

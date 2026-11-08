@@ -16,7 +16,15 @@ Freelancers and micro-businesses, especially solo workers billing international 
 | "Remind Acme" | The AI writes a warm reminder, you approve, PayPal sends it |
 | "Cancel Initech" | Approval, then `POST /v2/invoicing/invoices/{id}/cancel` |
 | "Pay maria@studio.com 120 USD for illustrations" | Approval + cap check, then PayPal Payouts (`POST /v1/payments/payouts`) |
+| "Who should I chase first?" | Ranks clients by payment risk (average days to pay, late-payment rate, overdue balance). Automatic reminders get firmer, but stay polite, for higher-risk clients |
 | "Show unpaid invoices" / "Cash flow summary" | Read-only answers from your ledger |
+
+## Dashboard
+- **Invoices grid** built on AG Grid Community: sort, filter, resize, pay links and a per-row PayPal status sync.
+- **Client insights:** risk level, amount owed, average days to pay and late rate per client.
+- **KPIs:** collected, outstanding, overdue, and an *estimated* admin time saved (12 min per invoice, 5 per reminder, 6 per reconciliation or payout; clearly labelled as an estimate).
+- **Audit log**, **voice input**, responsive down to phone width, light and dark themes.
+- **Load sample data** (demo mode only) fills in a realistic client history so insights have something to show.
 
 ## Why it's different
 - **Agentic, but safe.** The model can only *propose* actions through typed tools. Every write to PayPal goes through a human approval card. Caps on invoice and payout amounts are enforced in code (not in the prompt), and every proposal, approval, API call and webhook lands in the audit log.
@@ -40,7 +48,7 @@ Express server (src/app.js)
 ```
 
 ## AI: what's used and how
-- **Google Gemini (`gemini-2.5-flash`, free tier) with function calling.** The model gets 6 tool declarations (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `cash_flow_summary`). It extracts structured invoice data from free text, writes reminder copy, and chains tool results into a short answer.
+- **Google Gemini (`gemini-2.5-flash`, free tier) with function calling.** The model gets 7 tool declarations (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `client_insights`, `cash_flow_summary`). It extracts structured invoice data from free text, writes reminder copy, and chains tool results into a short answer.
 - **Guardrails in code:** every tool argument is validated (email format, positive amount, supported currency, net 0-90 days, 0-3 reminders, caps). Invalid calls return errors to the model so it asks the user instead of guessing.
 - **Swappable provider:** `src/agent/providers.js` defines a one-method interface (`step(history, tools)`). Adding Claude/OpenAI is a ~30-line adapter.
 - **Demo provider:** no key? A deterministic parser emits the same tool calls, so the product still works end to end. The UI badge shows which provider is active.
@@ -81,7 +89,7 @@ See [`.env.example`](.env.example). Every key is optional; missing keys switch t
 - Voice input uses the browser's Web Speech API (Chrome/Edge).
 
 ## Third-party
-Express (MIT), dotenv (BSD-2-Clause). PayPal REST APIs (sandbox) and the Google Gemini API are used under their developer terms. No other assets.
+Express (MIT), dotenv (BSD-2-Clause), AG Grid Community 32.3.3 (MIT, loaded from the jsDelivr CDN; the app falls back to a plain table if it fails to load). PayPal REST APIs (sandbox) and the Google Gemini API are used under their developer terms. No other assets.
 
 ## License
 MIT. See [LICENSE](LICENSE).

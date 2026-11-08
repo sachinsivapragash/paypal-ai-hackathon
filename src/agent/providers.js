@@ -40,6 +40,7 @@ function demo() {
     const t = text.trim();
     const lower = t.toLowerCase();
     const isInvoiceRequest = /^(please\s+)?(invoice|bill|charge)\b/.test(lower);
+    if (/\b(who should i (chase|remind|follow up)|insights?|risk|late payers?|slow payers?|who pays)\b/.test(lower)) return [{ name: 'client_insights', args: {} }];
     if (!isInvoiceRequest && /\b(remind|nudge|follow up|chase)\b/.test(lower)) {
       const who = lower.match(/(?:remind|nudge|chase|follow up with)\s+([a-z0-9 .&'-]+?)(?:\s+about|\s+for|$|[,.!])/i)?.[1]?.trim();
       const target = who && who !== 'them' ? who : (lower.match(/#?(\d{4,})/)?.[1] || '');
@@ -83,6 +84,12 @@ function demo() {
     if (!r.ok) return `I couldn't do that: ${r.errors.join('; ')}.`;
     if (name === 'create_invoice') return `I drafted an invoice for ${r.preview.clientName}: ${r.preview.amount} ${r.preview.currency} for "${r.preview.description}", due in ${r.preview.netDays} days with ${r.preview.reminders} reminder(s). Please review and approve it on the card.`;
     if (name === 'send_reminder') return `Here's a reminder for invoice #${r.preview.number} (${r.preview.clientName}). Approve it to send through PayPal.`;
+    if (name === 'client_insights') {
+      if (!r.clients.length) return 'No payment history yet. Send a few invoices first.';
+      const chase = r.clients.filter((c) => c.open > 0);
+      const lines = r.clients.map((c) => `• ${c.client}: ${c.risk} risk · owes ${c.owed} · avg ${c.avgDaysToPay ?? 'n/a'} days to pay · ${c.lateRate}% late`);
+      return (chase.length ? `Chase ${chase[0].client} first (${chase[0].risk} risk, owes ${chase[0].owed}).\n` : 'Nobody owes you right now.\n') + lines.join('\n');
+    }
     if (name === 'pay_contractor') return `Payout ready: ${r.preview.amount} ${r.preview.currency} to ${r.preview.recipientEmail} for "${r.preview.note}". No money moves until you approve.`;
     if (name === 'cancel_invoice') return `Ready to cancel invoice #${r.preview.number} for ${r.preview.clientName}. Approve to confirm.`;
     if (name === 'list_invoices') return r.invoices.length ? `You have ${r.invoices.length} matching invoice(s):\n` + r.invoices.map((i) => `• #${i.number} ${i.client}: ${i.amount} ${i.currency} (${i.status})`).join('\n') : 'No matching invoices yet.';

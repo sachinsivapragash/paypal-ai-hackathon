@@ -6,6 +6,8 @@
   <title>DuePilot</title>
   <meta name="description" content="AI collections agent for freelancers, powered by PayPal invoicing and payouts." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M9 22l5-12 4 8 2-4 3 8' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -31,11 +33,15 @@
     <section class="panel data" aria-label="Records">
       <div class="tabs" role="tablist">
         <button role="tab" class="tab active" data-tab="invoices">Invoices</button>
+        <button role="tab" class="tab" data-tab="insights">Client insights</button>
         <button role="tab" class="tab" data-tab="payouts">Payouts</button>
         <button role="tab" class="tab" data-tab="audit">Audit log</button>
-        <button class="ghost small push" id="remindBtn" title="Send any reminders that are due now">Run reminders</button>
+        <span class="push"></span>
+        <button class="ghost small hidden" id="seedBtn" title="Load sample clients and payment history (demo mode only)">Load sample data</button>
+        <button class="ghost small" id="remindBtn" title="Send any reminders that are due now">Run reminders</button>
       </div>
-      <div class="tabpane" id="pane-invoices"></div>
+      <div class="tabpane" id="pane-invoices"><div id="grid" class="ag-theme-quartz grid-host"></div><div id="gridEmpty"></div></div>
+      <div class="tabpane hidden" id="pane-insights"></div>
       <div class="tabpane hidden" id="pane-payouts"></div>
       <div class="tabpane hidden" id="pane-audit"></div>
     </section>
@@ -43,6 +49,7 @@
 
   <footer class="foot">PayPal sandbox only · no real money · every money action needs your approval · <a href="https://github.com/sachinsivapragash/paypal-ai-hackathon" id="repoLink">source</a></footer>
   <div class="toast" id="toast" role="status"></div>
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

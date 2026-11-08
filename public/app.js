@@ -52,18 +52,57 @@ function renderCard(p) {
 }
 
 function setState(s) { state = s; render(); }
+
+// Invoices: AG Grid Community (sort, filter, resize). Falls back to a plain table if the CDN is unreachable.
+let grid = null;
+const statusCell = (p) => `<span class="status s-${esc(p.value)}">${esc(p.value)}</span>`;
+const actionsCell = (p) => {
+  const i = p.data;
+  return `<span class="row-actions">${i.payLink && ['SENT', 'OVERDUE'].includes(i.status) ? `<a href="${esc(i.payLink)}" target="_blank" rel="noopener">Pay link</a>` : ''}<button class="ghost small" data-sync="${esc(i.id)}" title="Check status with PayPal">Sync</button></span>`;
+};
+function renderInvoices(inv) {
+  $('#gridEmpty').innerHTML = inv.length ? '' : '<div class="empty"><strong>No invoices yet</strong>Ask the agent to invoice a client and approve the card. In demo mode you can also click "Load sample data".</div>';
+  $('#grid').style.display = inv.length ? '' : 'none';
+  if (!window.agGrid) {
+    $('#grid').innerHTML = inv.length ? `<table><thead><tr><th>#</th><th>Client</th><th class="num">Amount</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>${inv.map((i) => `<tr><td>${esc(i.number)}</td><td>${esc(i.clientName)}</td><td class="num">${fmt(i.amount, i.currency)}</td><td>${statusCell({ value: i.status })}</td><td>${esc(i.dueDate)}</td><td>${actionsCell({ data: i })}</td></tr>`).join('')}</tbody></table>` : '';
+    return;
+  }
+  if (!grid) {
+    grid = agGrid.createGrid($('#grid'), {
+      rowData: [],
+      getRowId: (p) => p.data.id,
+      animateRows: true,
+      defaultColDef: { sortable: true, filter: true, resizable: true },
+      columnDefs: [
+        { field: 'number', headerName: '#', width: 90 },
+        { field: 'clientName', headerName: 'Client', flex: 1, minWidth: 140 },
+        { field: 'description', headerName: 'For', flex: 1, minWidth: 140 },
+        { field: 'amount', headerName: 'Amount', width: 120, type: 'rightAligned', filter: 'agNumberColumnFilter', valueFormatter: (p) => fmt(p.value, p.data.currency) },
+        { field: 'status', headerName: 'Status', width: 120, cellRenderer: statusCell },
+        { field: 'dueDate', headerName: 'Due', width: 120, sort: 'desc' },
+        { headerName: 'Reminders', width: 130, valueGetter: (p) => `${p.data.remindersSent || 0} sent · ${p.data.remindersLeft || 0} left` },
+        { headerName: '', width: 150, sortable: false, filter: false, cellRenderer: actionsCell },
+      ],
+    });
+  }
+  grid.setGridOption('rowData', inv);
+}
+
+function renderInsights(list) {
+  if (!list.length) { $('#pane-insights').innerHTML = '<div class="empty"><strong>No payment history yet</strong>Insights appear once clients have been invoiced. Ask "Who should I chase first?"</div>'; return; }
+  const chase = list.find((c) => c.open > 0);
+  $('#pane-insights').innerHTML = `${chase ? `<div class="insight-lead">Chase <b>${esc(chase.client)}</b> first: ${esc(chase.risk)} risk, owes ${fmt(chase.owed)}. Reminders to higher-risk clients are automatically firmer (still polite).</div>` : ''}
+    <table><thead><tr><th>Client</th><th>Risk</th><th class="num">Owed</th><th class="num">Avg days to pay</th><th class="num">Paid late</th><th class="num">Invoices</th></tr></thead><tbody>${list.map((c) => `
+    <tr><td>${esc(c.client)}</td><td><span class="risk risk-${esc(c.risk)}">${esc(c.risk)}</span></td><td class="num">${fmt(c.owed)}</td><td class="num">${c.avgDaysToPay ?? '–'}</td><td class="num">${c.lateRate}%</td><td class="num">${c.invoices}</td></tr>`).join('')}</tbody></table>`;
+}
 function render() {
   const s = state.summary || {};
-  $('#kpis').innerHTML = [['Collected', s.paid, 'ok'], ['Outstanding', s.outstanding, 'warn'], ['Overdue', s.overdue, 'bad'], ['Invoices', s.count, '']]
-    .map(([k, v, c], i) => `<div class="kpi ${c}"><span>${k}</span><strong>${i === 3 ? (v || 0) : fmt(v || 0)}</strong></div>`).join('');
+  const mins = s.minutesSaved || 0;
+  $('#kpis').innerHTML = [['Collected', fmt(s.paid || 0), 'ok'], ['Outstanding', fmt(s.outstanding || 0), 'warn'], ['Overdue', fmt(s.overdue || 0), 'bad'], ['Admin time saved (est.)', mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`, 'info']]
+    .map(([k, v, c]) => `<div class="kpi ${c}"><span>${k}</span><strong>${v}</strong></div>`).join('');
 
-  const inv = state.invoices;
-  $('#pane-invoices').innerHTML = inv.length ? `<table><thead><tr><th>#</th><th>Client</th><th class="num">Amount</th><th>Status</th><th>Due</th><th>Reminders</th><th></th></tr></thead><tbody>${inv.map((i) => `
-    <tr><td>${esc(i.number)}</td><td>${esc(i.clientName)}<br><small style="color:var(--muted)">${esc(i.description)}</small></td><td class="num">${fmt(i.amount, i.currency)}</td>
-    <td><span class="status s-${i.status}">${i.status}</span></td><td>${esc(i.dueDate || '')}</td><td>${i.remindersSent || 0} sent · ${i.remindersLeft || 0} left</td>
-    <td class="row-actions">${i.payLink && ['SENT', 'OVERDUE'].includes(i.status) ? `<a class="small" href="${esc(i.payLink)}" target="_blank" rel="noopener">Pay link</a>` : ''}
-      <button class="ghost small" data-sync="${i.id}" title="Check status with PayPal">Sync</button></td></tr>`).join('')}</tbody></table>`
-    : `<div class="empty"><strong>No invoices yet</strong>Ask the agent to invoice a client, approve the card, and it appears here.</div>`;
+  renderInvoices(state.invoices);
+  renderInsights(state.insights || []);
 
   const pay = state.payouts;
   $('#pane-payouts').innerHTML = pay.length ? `<table><thead><tr><th>To</th><th class="num">Amount</th><th>For</th><th>Status</th><th>Batch</th></tr></thead><tbody>${pay.map((p) => `
@@ -97,7 +136,9 @@ $('#chatForm').addEventListener('submit', async (e) => {
   finally { $('#sendBtn').disabled = false; input.focus(); }
 });
 
-const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
+$('#seedBtn').addEventListener('click', async () => { try { setState(await api('/api/demo/seed', {})); toast('Loaded sample clients and payment history'); } catch (err) { toast(err.message); } });
+
+const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Who should I chase first?', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
 $('#chips').innerHTML = CHIPS.map((c) => `<button class="chip" type="button">${esc(c.length > 34 ? c.slice(0, 32) + '…' : c)}</button>`).join('');
 $('#chips').querySelectorAll('.chip').forEach((b, i) => b.addEventListener('click', () => { $('#chatInput').value = CHIPS[i]; $('#chatInput').focus(); }));
 
@@ -123,6 +164,7 @@ function greet() { addMsg(`Hi! I'm DuePilot. Tell me who to invoice or pay in pl
   try {
     status = await api('/api/status');
     $('#badges').innerHTML = `<span class="badge">PayPal: <b>${status.paypal === 'sandbox' ? 'Sandbox' : 'Demo simulator'}</b></span><span class="badge">AI: <b>${esc(status.ai)}</b></span><span class="badge">Webhook signatures: <b>${status.webhookVerification ? 'verified' : 'n/a in demo'}</b></span>`;
+    if (status.paypal === 'demo') $('#seedBtn').classList.remove('hidden');
     setState(await api('/api/state'));
     state.pending.forEach(renderCard);
   } catch (err) { addMsg(`Can't reach the server: ${err.message}`, 'bot err'); }

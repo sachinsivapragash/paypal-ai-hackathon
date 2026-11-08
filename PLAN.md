@@ -21,11 +21,13 @@
 Gemini 2.5 Flash function calling (free tier), provider interface in `src/agent/providers.js`, keyless demo provider. Schema validation + caps in `src/agent/tools.js`.
 
 ## Milestones
-- **Nov 8** ✅ Scaffold, PayPal client, agent, approvals, webhooks, UI, tests (9 passing), README, render.yaml, submission + video docs.
+- **Nov 8** ✅ Scaffold, PayPal client, agent, approvals, webhooks, UI, tests, README, render.yaml, submission + video docs.
 - **Nov 9** Create sandbox app + keys (user); run full flow against real sandbox; fix API differences; deploy to Render; add webhook in sandbox app.
 - **Nov 10** Feature freeze. Test with Gemini key. Screenshots in README. Fresh-clone QA.
 - **Nov 11** Record + edit video; upload to YouTube (public).
 - **Nov 12 morning IST** Submit on Devpost. Verify links, license in About.
+
+- **Nov 8 (later)** ✅ Client risk insights + escalating reminder tone, AG Grid invoices grid (sponsor prize), demo sample data, time-saved KPI. 13 tests passing.
 
 ## Cut list (drop in this order if behind)
 1. Voice input

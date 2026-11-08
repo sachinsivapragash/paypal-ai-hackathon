@@ -30,6 +30,7 @@ a { color: var(--accent); }
 .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
 .kpi span { color: var(--muted); font-size: 13px; }
 .kpi strong { display: block; font-size: 24px; letter-spacing: -.02em; }
+.kpi.info strong { color: var(--accent); }
 .kpi.ok strong { color: var(--ok); } .kpi.warn strong { color: var(--warn); } .kpi.bad strong { color: var(--bad); }
 
 .grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(0, 1.4fr); gap: 16px; padding: 0 24px 16px; }
@@ -62,7 +63,8 @@ h2 { margin: 0; font-size: 16px; }
 .tab { background: transparent; color: var(--muted); font-weight: 600; padding: 8px 12px; }
 .tab.active { background: var(--surface-2); color: var(--text); }
 .push { margin-left: auto; }
-.tabpane { overflow: auto; flex: 1; }
+.tabpane { overflow: auto; flex: 1; min-height: 360px; }
+.data { min-height: 520px; }
 .hidden { display: none; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -82,6 +84,13 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; } th.num { text-
 .audit-item code { color: var(--muted); font-size: 12px; word-break: break-word; white-space: normal; }
 .actor { font-weight: 600; }
 
+.grid-host { height: 100%; min-height: 360px; width: 100%; }
+.ag-theme-quartz { --ag-font-family: inherit; --ag-background-color: var(--surface); --ag-foreground-color: var(--text); --ag-header-background-color: var(--surface); --ag-border-color: var(--border); --ag-row-hover-color: var(--surface-2); --ag-header-foreground-color: var(--muted); --ag-odd-row-background-color: var(--surface); }
+.risk { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: capitalize; }
+.risk-high { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+.risk-medium { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.risk-low { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.insight-lead { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 14px; }
 .foot { text-align: center; color: var(--muted); font-size: 12px; padding: 8px 24px 24px; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(120px); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; transition: transform .25s; max-width: calc(100vw - 32px); z-index: 10; }
 .toast.show { transform: translateX(-50%) translateY(0); }
