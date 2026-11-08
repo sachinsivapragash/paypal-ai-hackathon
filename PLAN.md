@@ -18,7 +18,7 @@
 | Idempotency | `PayPal-Request-Id` header, stable per action+step | all writes |
 
 ## AI
-Gemini 2.5 Flash function calling (free tier), provider interface in `src/agent/providers.js`, keyless demo provider. Schema validation + caps in `src/agent/tools.js`.
+Gemini 3.5 Flash function calling (free tier), provider interface in `src/agent/providers.js`, keyless demo provider. Schema validation + caps in `src/agent/tools.js`.
 
 ## Milestones
 - **Nov 8** ✅ Scaffold, PayPal client, agent, approvals, webhooks, UI, tests, README, render.yaml, submission + video docs.

@@ -80,9 +80,21 @@ test('webhook endpoint: rejects bad signatures, reconciles valid ones once', asy
   } finally { await t.close(); }
 });
 
+test('Gemini: rate limit on main model retries on the lite model; raw parts (thought signatures) are replayed', async () => {
+  const f = mockFetch((url) => url.includes('gemini-main') ? json(429, { error: { message: 'quota' } })
+    : json(200, { candidates: [{ content: { parts: [{ functionCall: { name: 'list_invoices', args: {} }, thoughtSignature: 'sig' }] } }] }));
+  const p = gemini({ apiKey: 'k', model: 'gemini-main', fallbackModel: 'gemini-lite', system: 's', fetchImpl: f });
+  const out = await p.step([{ role: 'user', text: 'list' }], []);
+  assert.strictEqual(out.calls[0].name, 'list_invoices');
+  assert.ok(f.calls[1].url.includes('gemini-lite'));
+  await p.step([{ role: 'user', text: 'list' }, { role: 'model', calls: out.calls, raw: out.raw }, { role: 'tool', name: 'list_invoices', result: { ok: true } }], []);
+  const replay = JSON.parse(f.calls.at(-1).opts.body).contents[1].parts[0];
+  assert.strictEqual(replay.thoughtSignature, 'sig');
+});
+
 test('Gemini provider maps functionCall parts to tool calls and sends tools', async () => {
   const f = mockFetch(() => json(200, { candidates: [{ content: { parts: [{ functionCall: { name: 'create_invoice', args: { client_name: 'Acme' } } }] } }] }));
-  const p = gemini({ apiKey: 'k', model: 'gemini-2.5-flash', system: 's', fetchImpl: f });
+  const p = gemini({ apiKey: 'k', model: 'gemini-3.5-flash', system: 's', fetchImpl: f });
   const out = await p.step([{ role: 'user', text: 'bill acme' }], [{ name: 'create_invoice' }]);
   assert.deepStrictEqual(out.calls, [{ name: 'create_invoice', args: { client_name: 'Acme' } }]);
   const sent = JSON.parse(f.calls[0].opts.body);

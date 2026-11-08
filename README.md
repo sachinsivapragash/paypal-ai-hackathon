@@ -48,8 +48,9 @@ Express server (src/app.js)
 ```
 
 ## AI: what's used and how
-- **Google Gemini (`gemini-2.5-flash`, free tier) with function calling.** The model gets 7 tool declarations (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `client_insights`, `cash_flow_summary`). It extracts structured invoice data from free text, writes reminder copy, and chains tool results into a short answer.
+- **Google Gemini (`gemini-3.5-flash`, free tier) with function calling.** The model gets 7 tool declarations (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `client_insights`, `cash_flow_summary`). It extracts structured invoice data from free text, writes reminder copy, and chains tool results into a short answer.
 - **Guardrails in code:** every tool argument is validated (email format, positive amount, supported currency, net 0-90 days, 0-3 reminders, caps). Invalid calls return errors to the model so it asks the user instead of guessing.
+- **Resilient on the free tier:** if the main model is rate-limited or overloaded, the agent retries on `gemini-3.5-flash-lite` (separate free quota). If that also fails, the built-in parser answers and the reply says so openly. Gemini 3 "thought signatures" are replayed unchanged across tool-call turns, and every call has a 25 s timeout.
 - **Swappable provider:** `src/agent/providers.js` defines a one-method interface (`step(history, tools)`). Adding Claude/OpenAI is a ~30-line adapter.
 - **Demo provider:** no key? A deterministic parser emits the same tool calls, so the product still works end to end. The UI badge shows which provider is active.
 

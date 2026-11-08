@@ -2,17 +2,19 @@
 //   provider.step(history, declarations) -> { text?: string, calls?: [{ name, args }] }
 // history items: { role: 'user'|'model', text } | { role: 'model', calls } | { role: 'tool', name, result }
 
-function gemini({ apiKey, model, fetchImpl = globalThis.fetch, system }) {
+function gemini({ apiKey, model, fallbackModel, fetchImpl = globalThis.fetch, system }) {
   const toContents = (history) => history.map((h) => {
     if (h.role === 'tool') return { role: 'user', parts: [{ functionResponse: { name: h.name, response: h.result } }] };
-    if (h.calls) return { role: 'model', parts: h.calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })) };
+    // Gemini 3 requires its own parts (incl. thoughtSignature) to be sent back unchanged.
+    if (h.calls) return { role: 'model', parts: h.raw || h.calls.map((c) => ({ functionCall: { name: c.name, args: c.args } })) };
     return { role: h.role, parts: [{ text: h.text }] };
   });
-  return {
-    name: `gemini:${model}`,
-    async step(history, declarations) {
-      const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  // On rate limits (429) or overload (503), retry once on the lite model, which has its own free-tier quota.
+  const models = [model, ...(fallbackModel && fallbackModel !== model ? [fallbackModel] : [])];
+  async function call(m, history, declarations) {
+      const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
         method: 'POST',
+        signal: AbortSignal.timeout(25_000), // never leave the user staring at "thinking…"
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
@@ -22,11 +24,21 @@ function gemini({ apiKey, model, fetchImpl = globalThis.fetch, system }) {
         }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(`Gemini error: ${body.error?.message || res.status}`);
+      if (!res.ok) { const e = new Error(`Gemini error: ${body.error?.message || res.status}`); e.status = res.status; throw e; }
       const parts = body.candidates?.[0]?.content?.parts || [];
       const calls = parts.filter((p) => p.functionCall).map((p) => ({ name: p.functionCall.name, args: p.functionCall.args || {} }));
       const text = parts.filter((p) => p.text).map((p) => p.text).join('').trim();
-      return calls.length ? { calls, text } : { text: text || "Sorry, I didn't catch that." };
+      return calls.length ? { calls, text, raw: parts } : { text: text || "Sorry, I didn't catch that." };
+  }
+  return {
+    name: `gemini:${model}`,
+    async step(history, declarations) {
+      for (let i = 0; ; i++) {
+        try { return await call(models[i], history, declarations); } catch (e) {
+          const transient = e.status === 429 || e.status === 503 || e.name === 'TimeoutError';
+          if (!transient || i === models.length - 1) throw e;
+        }
+      }
     },
   };
 }

@@ -27,13 +27,13 @@ Freelancers and one-person businesses spend hours chasing payments: writing invo
 - **Keyless demo mode** so anyone can try every flow instantly.
 
 ## How we built it
-Node.js + Express backend, vanilla JS frontend, JSON-file store. The agent loop sends the conversation plus 6 tool declarations to **Google Gemini 2.5 Flash (function calling)**. Tools that read data run immediately; tools that write only create *pending actions*. The approval endpoint is the only code path that calls PayPal's write APIs, and it uses a stable `PayPal-Request-Id` per action and step, so retries and double-clicks can never create duplicate invoices or payouts. The PayPal client handles OAuth token caching, retries on 429/5xx with the same idempotency key, and clear error messages. Webhooks are verified with PayPal's verify-webhook-signature API before any state changes. Hosted on Render.
+Node.js + Express backend, vanilla JS frontend, JSON-file store. The agent loop sends the conversation plus 6 tool declarations to **Google Gemini 3.5 Flash (function calling)**. Tools that read data run immediately; tools that write only create *pending actions*. The approval endpoint is the only code path that calls PayPal's write APIs, and it uses a stable `PayPal-Request-Id` per action and step, so retries and double-clicks can never create duplicate invoices or payouts. The PayPal client handles OAuth token caching, retries on 429/5xx with the same idempotency key, and clear error messages. Webhooks are verified with PayPal's verify-webhook-signature API before any state changes. Hosted on Render.
 
 ## PayPal APIs used
 OAuth2 · Invoicing v2 (create, send, get, remind, cancel) · Payouts · Webhooks (verify-webhook-signature; `INVOICING.INVOICE.PAID`, `INVOICING.INVOICE.CANCELLED`). Sandbox only.
 
 ## AI tools used and exactly how
-- **Google Gemini 2.5 Flash** via the Generative Language REST API with **function calling**. It (1) turns free-text requests into structured tool calls (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `client_insights`, `cash_flow_summary`), (2) writes reminder messages, and (3) summarizes tool results for the user.
+- **Google Gemini 3.5 Flash** via the Generative Language REST API with **function calling**. It (1) turns free-text requests into structured tool calls (`create_invoice`, `send_reminder`, `cancel_invoice`, `pay_contractor`, `list_invoices`, `client_insights`, `cash_flow_summary`), (2) writes reminder messages, and (3) summarizes tool results for the user.
 - **Guardrails outside the model:** all tool arguments are schema-validated in code (email, amount > 0, currency whitelist, terms 0-90 days, ≤3 reminders, invoice cap 5,000, payout cap 500); invalid calls are returned to the model as errors.
 - **Provider-agnostic:** a one-method provider interface; a keyless deterministic demo provider emits the same tool calls when no API key is set (shown as "AI: demo" in the UI).
 - Browser **Web Speech API** for voice input.

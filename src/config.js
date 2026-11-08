@@ -14,7 +14,8 @@ const config = {
   ai: {
     provider: (env.AI_PROVIDER || 'gemini').toLowerCase(),
     geminiKey: env.GEMINI_API_KEY || '',
-    geminiModel: env.GEMINI_MODEL || 'gemini-2.5-flash',
+    geminiModel: env.GEMINI_MODEL || 'gemini-3.5-flash',
+    geminiFallbackModel: env.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash-lite',
   },
   maxInvoiceAmount: Number(env.MAX_INVOICE_AMOUNT) || 5000,
   maxPayoutAmount: Number(env.MAX_PAYOUT_AMOUNT) || 500,
