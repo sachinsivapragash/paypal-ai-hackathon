@@ -56,7 +56,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
   });
 
   app.get('/api/status', (req, res) => res.json({
-    paypal: paypal.mode, ai: provider.name, maxInvoiceAmount: config.maxInvoiceAmount, maxPayoutAmount: config.maxPayoutAmount,
+    paypal: paypal.mode, ai: provider.name, demoBuyerEmail: config.demoBuyerEmail || null, maxInvoiceAmount: config.maxInvoiceAmount, maxPayoutAmount: config.maxPayoutAmount,
     webhookVerification: !config.paypalDemo && !!config.paypal.webhookId,
   }));
   app.get('/api/state', (req, res) => res.json(view()));

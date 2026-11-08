@@ -19,6 +19,8 @@ const config = {
   },
   maxInvoiceAmount: Number(env.MAX_INVOICE_AMOUNT) || 5000,
   maxPayoutAmount: Number(env.MAX_PAYOUT_AMOUNT) || 500,
+  // Sandbox buyer used to pre-fill the guided demo (a test account, not a secret).
+  demoBuyerEmail: env.DEMO_BUYER_EMAIL || '',
   dataFile: env.DATA_FILE || require('path').join(__dirname, '..', 'data', 'db.json'),
 };
 

@@ -4,44 +4,77 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DuePilot</title>
-  <meta name="description" content="AI collections agent for freelancers, powered by PayPal invoicing and payouts." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M9 22l5-12 4 8 2-4 3 8' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <meta name="description" content="AI collections agent for freelancers: invoices, reminders, payment matching and payouts through PayPal, with human approval." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%236d5efc'/><stop offset='1' stop-color='%2306b6d4'/></linearGradient></defs><rect width='32' height='32' rx='9' fill='url(%23g)'/><path d='M9 21.5l5.2-5.2 3.3 3.3L23 14' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/><path d='M19 14h4v4' stroke='white' stroke-width='2.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <div class="wake" id="wake" hidden><span class="spinner"></span>Waking up the demo server… this takes a few seconds on the free plan.</div>
+
   <header class="top">
-    <div class="brand"><span class="logo">D</span><div><strong>DuePilot</strong><small>AI collections agent</small></div></div>
+    <a class="brand" href="/" aria-label="DuePilot home">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d5efc"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M9 21.5l5.2-5.2 3.3 3.3L23 14" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 14h4v4" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><strong>DuePilot</strong><small>AI collections agent</small></div>
+    </a>
     <div class="badges" id="badges"></div>
   </header>
+
+  <section class="hero" id="hero" aria-labelledby="heroTitle">
+    <div class="hero-copy">
+      <span class="eyebrow">PayPal × Gemini · Agentic commerce, human-approved</span>
+      <h1 id="heroTitle">Get paid without chasing.</h1>
+      <p class="lede">Tell DuePilot who owes you, in plain English or by pasting their email. It drafts the PayPal invoice, waits for your OK, sends it, nudges late payers and matches the money when it lands.</p>
+      <div class="hero-cta">
+        <button id="startDemo">Start the 60-second demo</button>
+        <button class="ghost" id="heroEmail">✉ Paste a client email</button>
+        <button class="link" id="hideHero">Hide intro</button>
+      </div>
+    </div>
+    <ol class="steps" id="demoSteps" aria-label="Guided demo"></ol>
+  </section>
+
+  <section class="flow" id="flow" aria-label="How DuePilot works">
+    <div class="flow-step"><span class="flow-ic">💬</span><b>You ask</b><small>text, voice or a pasted email</small></div>
+    <div class="flow-step"><span class="flow-ic">🧠</span><b>Gemini plans</b><small>typed, validated tool calls</small></div>
+    <div class="flow-step"><span class="flow-ic">✅</span><b>You approve</b><small>caps enforced in code</small></div>
+    <div class="flow-step"><span class="flow-ic">🅿️</span><b>PayPal acts</b><small>invoice · payout · record payment</small></div>
+    <div class="flow-step"><span class="flow-ic">🔁</span><b>Webhook confirms</b><small>signature-verified, auto-reconciled</small></div>
+  </section>
 
   <section class="kpis" id="kpis" aria-label="Cash flow"></section>
   <section class="briefing" id="briefing" aria-label="Weekly briefing" aria-live="polite"></section>
 
   <main class="grid">
     <section class="panel chat" aria-label="Agent chat">
-      <div class="panel-head"><h2>Ask DuePilot</h2><button class="ghost small" id="resetBtn" title="Clear all demo data">Reset</button></div>
+      <div class="panel-head"><h2><span class="dot"></span>Ask DuePilot</h2><button class="ghost small" id="resetBtn" title="Clear all demo data">Reset</button></div>
       <div class="messages" id="messages" aria-live="polite"></div>
       <div class="chips" id="chips"></div>
       <form id="chatForm" class="composer">
-        <input id="chatInput" autocomplete="off" placeholder='e.g. "Invoice Acme ap@acme.com 450 USD for logo work, net 7, remind them twice"' aria-label="Message" />
+        <input id="chatInput" autocomplete="off" placeholder='Try: "Invoice Acme ap@acme.com $450 for logo work, net 7"' aria-label="Message" />
         <button type="button" id="emailBtn" class="ghost icon" title="Paste a client's email and let DuePilot draft the invoice" aria-label="Draft invoice from a client email">✉</button>
         <button type="button" id="micBtn" class="ghost icon" title="Speak your request" aria-label="Voice input">🎙</button>
-        <button type="submit" id="sendBtn">Send</button>
+        <button type="submit" id="sendBtn" aria-label="Send">Send</button>
       </form>
     </section>
 
     <section class="panel data" aria-label="Records">
-      <div class="tabs" role="tablist">
-        <button role="tab" class="tab active" data-tab="invoices">Invoices</button>
-        <button role="tab" class="tab" data-tab="insights">Client insights</button>
-        <button role="tab" class="tab" data-tab="matching">Matching</button>
-        <button role="tab" class="tab" data-tab="payouts">Payouts</button>
-        <button role="tab" class="tab" data-tab="audit">Audit log</button>
-        <span class="push"></span>
-        <button class="ghost small hidden" id="seedBtn" title="Load sample clients and payment history (demo mode only)">Load sample data</button>
-        <button class="ghost small" id="remindBtn" title="Send any reminders that are due now">Run reminders</button>
+      <div class="tabbar">
+        <div class="tabs" role="tablist">
+          <button role="tab" class="tab active" data-tab="invoices">🧾 Invoices</button>
+          <button role="tab" class="tab" data-tab="insights">📈 Insights</button>
+          <button role="tab" class="tab" data-tab="matching">🔎 Matching</button>
+          <button role="tab" class="tab" data-tab="payouts">💸 Payouts</button>
+          <button role="tab" class="tab" data-tab="audit">🛡 Audit log</button>
+        </div>
+        <div class="tab-tools">
+          <button class="ghost small hidden" id="seedBtn" title="Load sample clients and payment history (demo mode only)">Load sample data</button>
+          <button class="ghost small" id="remindBtn" title="Send any reminders that are due now">Run reminders</button>
+        </div>
       </div>
       <div class="tabpane" id="pane-invoices"><div id="grid" class="ag-theme-quartz grid-host"></div><div id="gridEmpty"></div></div>
       <div class="tabpane hidden" id="pane-insights"></div>
@@ -51,7 +84,12 @@
     </section>
   </main>
 
-  <footer class="foot">PayPal sandbox only · no real money · every money action needs your approval · <a href="https://github.com/sachinsivapragash/paypal-ai-hackathon" id="repoLink">source</a></footer>
+  <footer class="foot">
+    <span>🔒 PayPal sandbox only, no real money</span><span>Every money action needs your approval</span>
+    <span>Built with PayPal Invoicing, Payouts, Webhooks &amp; Transaction Search + Google Gemini</span>
+    <a href="https://github.com/sachinsivapragash/paypal-ai-hackathon" id="repoLink">Source on GitHub ↗</a>
+  </footer>
+
   <dialog id="emailDialog" aria-labelledby="emailTitle">
     <form method="dialog" id="emailForm">
       <h2 id="emailTitle">Draft an invoice from a client email</h2>

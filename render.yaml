@@ -22,6 +22,8 @@ services:
         value: 5000
       - key: MAX_PAYOUT_AMOUNT
         value: 500
+      - key: DEMO_BUYER_EMAIL
+        value: sb-ratla53771659@personal.example.com
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET
