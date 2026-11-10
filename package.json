@@ -8,12 +8,20 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test test/*.test.js",
-    "setup": "npm install && node -e \"require('fs').existsSync('.env')||require('fs').copyFileSync('.env.example','.env')\""
+    "setup": "npm install && node -e \"require('fs').existsSync('.env')||require('fs').copyFileSync('.env.example','.env')\"",
+    "video:record": "node scripts/record-demo.js",
+    "video:build": "node scripts/assemble-video.js"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "license": "MIT",
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "playwright": "^1.49.1"
   }
 }
