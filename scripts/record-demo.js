@@ -115,8 +115,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   scene('5 approve and send');
   await click(lastCard().getByRole('button', { name: /Approve/ }));
   const link = lastCard().getByRole('link', { name: /Open PayPal pay link/ });
-  await link.waitFor({ timeout: 60000 });
-  await sleep(3500);
+  await waited(() => link.waitFor({ timeout: 60000 }));
+  await sleep(2500);
 
   scene('6 client pays on PayPal');
   await point(link);
@@ -141,13 +141,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await btn.click();
   popup = await popupP;
   const complete = popup.getByRole('button', { name: /Complete Purchase|Pay Now|^Pay$/ }).first();
-  await complete.waitFor({ timeout: 45000 });
-  await sleep(3500);
+  await waited(() => complete.waitFor({ timeout: 45000 }));
+  await sleep(2000);
   await complete.click();
-  await popup.waitForEvent('close', { timeout: 60000 }).catch(() => {});
+  await waited(() => popup.waitForEvent('close', { timeout: 60000 }).catch(() => {}));
   popupT1 = (Date.now() - t0) / 1000;
-  await page.getByText(/Payment successful/i).waitFor({ timeout: 45000 });
-  await sleep(3500);
+  await waited(() => page.getByText(/Payment successful/i).waitFor({ timeout: 45000 }));
+  await sleep(2500);
 
   scene('7 webhook marks it paid');
   await page.goto(APP);
@@ -162,7 +162,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await point(page.locator('#kpis'));
   await sleep(2500);
   await click(page.locator('[data-tab="audit"]'));
-  await sleep(4500);
+  await sleep(3000);
   await click(page.locator('[data-tab="invoices"]'));
 
   scene('8 invoice from a client email');
@@ -175,7 +175,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await waited(() => page.waitForFunction((n) => document.querySelectorAll('.card').length > n, cardsBefore, { timeout: 90000 }));
   await sleep(1000);
   await point(lastCard());
-  await sleep(5000);
+  await sleep(3500);
+  await click(lastCard().getByRole('button', { name: /Approve/ }));
+  await waited(() => lastCard().getByRole('link', { name: /Open PayPal pay link/ }).waitFor({ timeout: 60000 }));
+  await sleep(1500);
 
   scene('9 chase and remind');
   await waited(() => sleep(4000)); // Gemini free-tier pacing (cut from the video)
@@ -186,31 +189,31 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await point(remindCard);
   await sleep(2500);
   const remindBtn = remindCard.getByRole('button', { name: /Approve/ });
-  if (await remindBtn.count()) { await click(remindBtn); await sleep(3000); }
+  if (await remindBtn.count()) { await click(remindBtn); await waited(() => sleep(1800)); await sleep(1500); }
 
   scene('10 autopilot');
   await waited(() => sleep(4000)); // Gemini free-tier pacing (cut from the video)
   await click(page.locator('[data-tab="autopilot"]'));
-  await sleep(1500);
+  await sleep(700);
   await click(page.locator('#pane-autopilot .switch.big'));
   await page.waitForFunction(() => /Autopilot is ON/.test(document.querySelector('#pane-autopilot')?.innerText || ''), null, { timeout: 15000 });
-  await sleep(1200);
+  await sleep(600);
   const invRule = page.locator('#pane-autopilot .ap-rule').first();
   if (!(await invRule.locator('input[data-ap="invoices.enabled"]').isChecked())) await click(invRule.locator('.switch'));
-  await sleep(1000);
+  await sleep(500);
   const max = page.locator('input[data-ap-num="invoices.maxAmount"]');
   await click(max); await max.fill('200'); await max.press('Tab');
-  await sleep(1000);
+  await sleep(500);
   const known = page.locator('input[data-ap="invoices.knownClientsOnly"]');
   if (await known.isChecked()) await click(known);
-  await sleep(2500);
+  await sleep(1200);
   await send(`Invoice Acme Corp ${BUYER} 15 USD for a favicon`);
   await point(lastCard());
-  await sleep(4500);
+  await sleep(3000);
   await waited(() => sleep(4000)); // Gemini pacing (cut)
   await send(`Invoice Acme Corp ${BUYER} 450 USD for the full rebrand`);
   await point(lastCard());
-  await sleep(5000);
+  await sleep(3500);
 
   scene('11 pay a contractor');
   await waited(() => sleep(4000)); // Gemini pacing (cut)
@@ -219,9 +222,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await point(payCard);
   await sleep(2000);
   await click(payCard.getByRole('button', { name: /Approve/ }));
-  await sleep(2500);
+  await waited(() => sleep(1800)); await sleep(1500);
   await click(page.locator('[data-tab="payouts"]'));
-  await sleep(3500);
+  await sleep(2500);
 
   scene('12 briefing and matching');
   const gen = page.getByRole('button', { name: /Generate briefing/ });

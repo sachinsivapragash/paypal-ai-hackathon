@@ -10,6 +10,25 @@
 4. Gemini's free tier allows only a few requests per minute: **pause about 5 seconds between chat messages**. If a reply says "Gemini was unavailable…", stop and redo that scene.
 5. Do one full dry run. Then **Reset** again before the real take.
 
+## Voice clips (recorded video + your voice)
+The screen video is recorded automatically (`npm run video:record`). Record **one voice clip per scene**, name it by number (`01.m4a` … `13.m4a`), put them in `video/audio/`, then run `npm run video:build`. Each scene is fitted to its clip, so aim for the target lengths below (total about 2:35).
+
+| # | Scene | Target | Say |
+|---|---|---|---|
+| 01 | Hero | 8s | "Freelancers lose hours every month chasing payments. DuePilot is an AI agent that does that work for you, through PayPal." |
+| 02 | Badges, how it works | 8s | "It's live on Render, on the PayPal sandbox, with Google Gemini as the agent. You ask, Gemini plans, you approve, PayPal acts." |
+| 03 | Ask (voice or text) | 9s | "I can speak or type what I need. Gemini turns it into a structured tool call: client, amount, terms and reminders." |
+| 04 | Approval card | 6s | "Nothing reaches PayPal until I approve it, and limits are enforced in code." |
+| 05 | Approve and send | 6s | "Approved. DuePilot creates and sends a real PayPal invoice, safe to retry." |
+| 06 | Client pays | 16s | "Now I'm the client. I open the pay link and pay on PayPal's own checkout with a sandbox buyer account. Payment successful." |
+| 07 | Webhook → PAID | 15s | "PayPal sends a webhook. DuePilot verifies its signature and marks the invoice paid by itself. Collected goes up." |
+| 08 | Invoice from an email | 13s | "Clients often ask by email. I paste it, and Gemini pulls out the line items. The email is data only: it can't give DuePilot orders." |
+| 09 | Chase and remind | 14s | "Who should I chase first? DuePilot ranks clients by payment risk and drafts a friendly reminder for me to approve." |
+| 10 | Autopilot | 28s | "This is agentic commerce. I set a spending policy: small invoices can go out on their own, within a daily cap. Fifteen dollars goes straight to PayPal, logged with the rule that allowed it. Four hundred fifty is over my limit, so it waits for me." |
+| 11 | Pay a contractor | 13s | "It also pays my contractors through PayPal Payouts. Payouts always need my approval, and they're capped." |
+| 12 | Briefing and matching | 10s | "Gemini writes a weekly cash-flow briefing, and DuePilot matches stray payments using PayPal Transaction Search." |
+| 13 | Closing | 7s | "Invoicing, Payouts, webhooks and Transaction Search, with Gemini and human approval. DuePilot: get paid without chasing." |
+
 ## Shots
 
 | Time | What's on screen | Voice-over |
