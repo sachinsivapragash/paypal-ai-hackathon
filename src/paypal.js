@@ -3,6 +3,11 @@
 // Webhooks (verify-webhook-signature). Every mutating call carries a PayPal-Request-Id idempotency key.
 const crypto = require('crypto');
 
+// YYYY-MM-DD as PayPal sees it (America/Los_Angeles).
+function paypalDate(ms) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+}
+
 class PayPalError extends Error {
   constructor(message, status, body) { super(message); this.status = status; this.body = body; }
 }
@@ -60,13 +65,16 @@ function createPayPal(cfg,{ fetchImpl = globalThis.fetch, demo = false } = {}) {
   }
 
   function invoicePayload(d) {
-    const due = new Date(Date.now() + d.netDays * 86400000).toISOString().slice(0, 10);
+    // PayPal reads invoice dates in US Pacific time. Using UTC/IST "today" can be tomorrow there,
+    // which makes the invoice "Scheduled" (not payable). So both dates are computed in Pacific time.
+    const today = paypalDate(Date.now());
+    const due = paypalDate(Date.now() + d.netDays * 86400000);
     return {
       detail: {
         currency_code: d.currency,
         note: d.note || 'Thank you for your business!',
         payment_term: { due_date: due },
-        invoice_date: new Date().toISOString().slice(0, 10),
+        invoice_date: today,
       },
       ...(cfg.invoicerEmail ? { invoicer: { email_address: cfg.invoicerEmail } } : {}),
       primary_recipients: [{ billing_info: { name: { given_name: d.clientName }, email_address: d.clientEmail } }],
@@ -187,4 +195,4 @@ function createPayPal(cfg,{ fetchImpl = globalThis.fetch, demo = false } = {}) {
   return demo ? fake : real;
 }
 
-module.exports = { createPayPal, PayPalError, normalizeTxn };
+module.exports = { createPayPal, PayPalError, paypalDate, normalizeTxn };

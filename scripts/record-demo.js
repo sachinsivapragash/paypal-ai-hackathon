@@ -102,13 +102,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   if (await page.locator('#flow').count()) { await point(page.locator('#flow')); await sleep(4000); }
 
   scene('3 ask for an invoice');
+  await point(page.locator('#micBtn')); // voice input exists; headless browsers have no microphone, so we type
+  await sleep(1200);
   await send(`Invoice Acme Corp ${BUYER} 45 USD for the logo work, net 7, remind them twice`);
 
   scene('4 approval card');
   await point(lastCard());
   const safe = lastCard().locator('.safe');
-  if (await safe.count()) await point(safe);
   await sleep(4000);
+  await waited(() => sleep(4000)); // Gemini pacing (cut)
 
   scene('5 approve and send');
   await click(lastCard().getByRole('button', { name: /Approve/ }));
@@ -126,7 +128,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(1500);
   // The PayPal button is in an iframe; checkout opens in a pop-up window (recorded as its own video).
   let btnFrame = null;
-  for (let i = 0; i < 40 && !btnFrame; i++) { btnFrame = page.frames().find((f) => /smart\/buttons/.test(f.url())); if (!btnFrame) await sleep(500); }
+  for (let i = 0; i < 90 && !btnFrame; i++) {
+    btnFrame = page.frames().find((f) => /smart\/buttons/.test(f.url()));
+    if (!btnFrame) { if (i === 40) await page.reload(); await sleep(500); }
+  }
+  if (!btnFrame) { await page.screenshot({ path: path.join(OUT, 'fail.png') }); throw new Error('PayPal button did not load on the invoice page (see video/fail.png)'); }
   const btn = btnFrame.locator('[data-funding-source="paypal"]').first();
   await btn.waitFor({ timeout: 30000 });
   await point(btn);
@@ -171,8 +177,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await point(lastCard());
   await sleep(5000);
 
-  scene('9 autopilot');
-  await sleep(4000); // Gemini free-tier pacing
+  scene('9 chase and remind');
+  await waited(() => sleep(4000)); // Gemini free-tier pacing (cut from the video)
+  await send('Who should I chase first? Draft them a friendly reminder.');
+  await click(page.locator('[data-tab="insights"]'));
+  await sleep(2500);
+  const remindCard = lastCard();
+  await point(remindCard);
+  await sleep(2500);
+  const remindBtn = remindCard.getByRole('button', { name: /Approve/ });
+  if (await remindBtn.count()) { await click(remindBtn); await sleep(3000); }
+
+  scene('10 autopilot');
+  await waited(() => sleep(4000)); // Gemini free-tier pacing (cut from the video)
   await click(page.locator('[data-tab="autopilot"]'));
   await sleep(1500);
   await click(page.locator('#pane-autopilot .switch.big'));
@@ -190,12 +207,23 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await send(`Invoice Acme Corp ${BUYER} 15 USD for a favicon`);
   await point(lastCard());
   await sleep(4500);
-  await sleep(4000);
+  await waited(() => sleep(4000)); // Gemini pacing (cut)
   await send(`Invoice Acme Corp ${BUYER} 450 USD for the full rebrand`);
   await point(lastCard());
   await sleep(5000);
 
-  scene('10 briefing and matching');
+  scene('11 pay a contractor');
+  await waited(() => sleep(4000)); // Gemini pacing (cut)
+  await send(`Pay ${BUYER} 20 USD for illustration work`);
+  const payCard = lastCard();
+  await point(payCard);
+  await sleep(2000);
+  await click(payCard.getByRole('button', { name: /Approve/ }));
+  await sleep(2500);
+  await click(page.locator('[data-tab="payouts"]'));
+  await sleep(3500);
+
+  scene('12 briefing and matching');
   const gen = page.getByRole('button', { name: /Generate briefing/ });
   if (await gen.count()) {
     await click(gen);
@@ -209,7 +237,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await click(page.locator('[data-tab="matching"]'));
   await sleep(4000);
 
-  scene('11 closing');
+  scene('13 closing');
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   await point(page.locator('#heroTitle'));
   await sleep(6000);

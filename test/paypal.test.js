@@ -101,3 +101,10 @@ test('Gemini provider maps functionCall parts to tool calls and sends tools', as
   assert.strictEqual(sent.tools[0].functionDeclarations[0].name, 'create_invoice');
   assert.strictEqual(f.calls[0].opts.headers['x-goog-api-key'], 'k');
 });
+
+test('invoice dates use PayPal (US Pacific) time, so evening-in-India invoices are never "Scheduled"', () => {
+  const { paypalDate } = require('../src/paypal');
+  // 2026-11-11 03:00 UTC = Nov 11 08:30 IST, but still Nov 10 in California.
+  assert.strictEqual(paypalDate(Date.parse('2026-11-11T03:00:00Z')), '2026-11-10');
+  assert.strictEqual(paypalDate(Date.parse('2026-11-11T20:00:00Z')), '2026-11-11');
+});
