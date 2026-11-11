@@ -57,13 +57,17 @@ scenes.forEach((s, i) => {
   const out = path.join(tmp, `s${n}.mp4`);
   let vf = 'null';
   let note = '';
+  let target = voice ? L + 0.4 : S;
   if (voice && L > S) { vf = `tpad=stop_mode=clone:stop_duration=${(L - S + 0.4).toFixed(2)}`; note = `held last frame +${(L - S).toFixed(1)}s`; }
   else if (voice && S > L + 0.6) {
+    // Speed up at most 1.5x and NEVER trim: the payoff of a scene (PAID, Autopilot card) is usually at its end.
+    // If the scene is still longer than the voice, the voice simply ends early and the scene plays out silently.
     const speed = Math.min(1.5, S / (L + 0.4));
     vf = `setpts=PTS/${speed.toFixed(3)}`;
-    note = speed >= 1.5 && S / speed > L + 0.6 ? `sped up 1.5x and trimmed ${(S / 1.5 - L).toFixed(1)}s` : `sped up ${speed.toFixed(2)}x`;
+    target = Math.max(L + 0.4, S / speed);
+    note = `sped up ${speed.toFixed(2)}x${S / speed > L + 0.6 ? `, voice ends ${(S / speed - L).toFixed(1)}s early` : ''}`;
   }
-  const target = voice ? (L + 0.4).toFixed(2) : S.toFixed(2);
+  target = target.toFixed(2);
   const audioIn = voice ? ['-i', voice] : ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo'];
   run(['-i', silent, ...audioIn, '-filter_complex', `[0:v]${vf},trim=0:${target},setpts=PTS-STARTPTS[v];[1:a]aresample=48000,apad,atrim=0:${target},asetpts=PTS-STARTPTS[a]`,
     '-map', '[v]', '-map', '[a]', '-c:v', 'libx264', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', '-ac', '2', out]);

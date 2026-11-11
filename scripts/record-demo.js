@@ -69,12 +69,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await click(box);
     await box.pressSequentially(text, { delay: 28 });
   }
+  let fallbacks = 0;
   async function send(text) {
+    // Gemini's free tier allows only a few requests per minute; pause (cut from the video) before each turn.
+    await waited(() => sleep(9000));
     const before = await page.locator('.msg.bot').count();
     await type(text);
     await sleep(400);
     await click(page.locator('#sendBtn'));
     await waited(() => page.waitForFunction((n) => document.querySelectorAll('.msg.bot:not(.typing)').length > n, before, { timeout: 90000 }));
+    const reply = await page.locator('.msg.bot').last().innerText();
+    if (/Gemini was unavailable/i.test(reply)) { fallbacks++; console.warn('WARNING: Gemini fallback on:', text); }
     await sleep(1200);
   }
   async function waited(fn) {
@@ -245,6 +250,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await point(page.locator('#heroTitle'));
   await sleep(6000);
   scene('end');
+  const fbOnScreen = await page.locator('.msg.bot', { hasText: /Gemini was unavailable/i }).count();
 
   const video = page.video();
   const popVideo = popup && popup.video();
@@ -255,4 +261,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   fs.writeFileSync(path.join(OUT, 'scenes.json'), JSON.stringify({ scenes, cuts, popup: popVideo ? { start: popupT0, end: popupT1 } : null }, null, 2));
   await browser.close();
   console.log('saved', main, popVideo ? '+ popup.webm' : '');
+  if (fallbacks || fbOnScreen) { console.error(`RETAKE NEEDED: ${Math.max(fallbacks, fbOnScreen)} reply(ies) came from the fallback parser, not Gemini.`); process.exit(3); }
+  console.log('All agent replies came from Gemini.');
 })().catch((e) => { console.error('FAILED:', e.message); process.exit(1); });
