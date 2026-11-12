@@ -55,12 +55,14 @@ const declarations = [
   },
   {
     name: 'send_reminder',
-    description: 'Prepare a polite payment reminder for an unpaid invoice. Write the reminder text yourself in "message". Needs user approval.',
+    description: 'Prepare a polite payment reminder for an unpaid invoice. Write the reminder text yourself in "message". If the user asks for another language (e.g. "in Spanish", "in Hindi"), write the message in that language and set "language". Needs user approval.',
     parameters: {
       type: 'object',
       properties: {
         invoice: { type: 'string', description: 'Invoice id, number, or client name' },
-        message: { type: 'string', description: 'Short, warm, professional reminder text (max 400 chars)' },
+        message: { type: 'string', description: 'Short, warm, professional reminder text (max 400 chars), written in the requested language' },
+        language: { type: 'string', description: 'Language the message is written in, e.g. "English", "Spanish", "Hindi". Default English.' },
+        english_summary: { type: 'string', description: 'One-line English translation of the message, only when it is not in English, so the user can check it before approving' },
       },
       required: ['invoice', 'message'],
     },
@@ -251,7 +253,14 @@ function runTool(name, args, { store, config, allowedTools, source }) {
       const st = effectiveStatus(inv);
       if (!['SENT', 'OVERDUE'].includes(st)) return { ok: false, errors: [`invoice ${inv.number} is ${st}; only unpaid sent invoices can be ${name === 'cancel_invoice' ? 'cancelled' : 'reminded'}`] };
       const data = { invoiceId: inv.id, number: inv.number, clientName: inv.clientName, amount: inv.amount, currency: inv.currency };
-      if (name === 'send_reminder') data.message = String(args.message || '').slice(0, 400) || `Hi ${inv.clientName}, a friendly reminder that invoice #${inv.number} is awaiting payment. Thank you!`;
+      if (name === 'send_reminder') {
+        data.message = String(args.message || '').slice(0, 400) || `Hi ${inv.clientName}, a friendly reminder that invoice #${inv.number} is awaiting payment. Thank you!`;
+        const lang = String(args.language || 'English').trim().slice(0, 40);
+        if (!/^english$/i.test(lang)) {
+          data.language = lang.replace(/^\w/, (c) => c.toUpperCase());
+          if (args.english_summary) data.englishSummary = String(args.english_summary).slice(0, 300);
+        }
+      }
       const p = store.addPending({ id: store.id('act'), type: name, status: 'PENDING', createdAt: new Date().toISOString(), data });
       store.audit('agent', `proposed_${name}`, { pendingId: p.id, number: inv.number });
       return { ok: true, pending_approval: p.id, preview: data };

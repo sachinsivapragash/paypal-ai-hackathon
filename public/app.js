@@ -27,7 +27,7 @@ function cardFields(p) {
   if (p.type === 'create_recurring') return [['Client', d.clientName], ['Email', d.clientEmail], ['For', d.description], ['Amount', `${fmt(d.amount, d.currency)} every ${d.every}`], ['First invoice', d.startDate], ['Terms', `Net ${d.netDays}`]];
   if (p.type === 'record_payment') return [['Payment', `${fmt(d.amount, d.currency)} from ${d.payer || 'unknown'} on ${d.date}`], ['Invoice', `#${d.number} · ${d.clientName}`], ['Confidence', d.confidence], ['Why', d.reasons.join(', ')], ['PayPal txn', d.transactionId]];
   if (p.type === 'pay_contractor') return [['To', d.recipientEmail], ['Amount', fmt(d.amount, d.currency)], ['For', d.note]];
-  if (p.type === 'send_reminder') return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)], ['Message', d.message]];
+  if (p.type === 'send_reminder') return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)], ...(d.language ? [['Language', `🌐 ${d.language}`]] : []), ['Message', d.message], ...(d.englishSummary ? [['In English', d.englishSummary]] : [])];
   return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)]];
 }
 function renderCard(p) {
