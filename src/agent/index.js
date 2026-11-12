@@ -32,7 +32,8 @@ function createProvider(config, opts = {}) {
 async function runAgent(provider, userText, ctx, priorHistory = []) {
   const history = [...priorHistory.slice(-8), { role: 'user', text: String(userText).slice(0, 5000) }];
   const proposals = [];
-  for (let round = 0; round < 4; round++) {
+  const MAX_ROUNDS = 6; // e.g. insights → list → draft reminder takes 3–4 rounds; 6 leaves headroom
+  for (let round = 0; round < MAX_ROUNDS; round++) {
     const out = await provider.step(history, declarations);
     if (out.fallback) ctx.store.audit('system', 'ai_fallback', { reason: String(out.fallback).slice(0, 200) });
     if (!out.calls?.length) {
@@ -52,7 +53,10 @@ async function runAgent(provider, userText, ctx, priorHistory = []) {
       history.push({ role: 'tool', name: c.name, result });
     }
   }
-  return { reply: 'I stopped after several steps. Please check the cards below.', proposals, history };
+  const reply = proposals.length
+    ? `I've prepared ${proposals.length === 1 ? 'an action' : `${proposals.length} actions`} for you. Please review the card${proposals.length === 1 ? '' : 's'} below.`
+    : 'I looked into it but need a bit more detail. Could you rephrase or tell me which client you mean?';
+  return { reply, proposals, history };
 }
 
 // Wraps a pasted client email as clearly-delimited untrusted data for the agent.
