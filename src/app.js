@@ -25,6 +25,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     summary: { ...summary(store.db.invoices), minutesSaved: timeSaved(store.db.audit) },
     insights: clientInsights(store.db.invoices),
     reconcile: store.db.lastReconcile || null,
+    recurring: store.db.recurring || [],
     briefing: store.db.lastBriefing || null,
     autopilot: { policy: normalizePolicy(store.db.policy), spentToday: autoSpentToday(store.db.audit) },
   });
@@ -120,6 +121,14 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
       store.upsertInvoice({ id: inv.id, status: 'PAID', paidAt: new Date(d.date + 'T12:00:00Z').toISOString(), remindersLeft: 0, matchedTransaction: d.transactionId });
       return { number: inv.number, transactionId: d.transactionId };
     }
+    if (p.type === 'create_recurring') {
+      const { every, startDate, ...invoice } = d;
+      store.db.recurring = store.db.recurring || [];
+      const r = { id: store.id('rec'), ...invoice, every, active: true, nextRunAt: startDate, runs: 0, createdAt: new Date().toISOString() };
+      store.db.recurring.unshift(r);
+      store.save();
+      return { scheduleId: r.id, next: r.nextRunAt, every };
+    }
     if (p.type === 'pay_contractor') {
       const r = await paypal.createPayout(d, key('payout'));
       store.db.payouts = store.db.payouts || [];
@@ -173,6 +182,39 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     if (!done.length) return '';
     return '\n\n' + done.map((p) => `⚡ Autopilot already did this (${p.autopilot.reason})${p.result?.number ? `: invoice #${p.result.number} is on its way via PayPal` : ''}.`).join('\n');
   }
+  // ---- Recurring invoices: draft each due period's invoice; it then follows approval / Autopilot rules ----
+  const addPeriod = (date, every) => { const t = new Date(date + 'T12:00:00Z'); if (every === 'week') t.setUTCDate(t.getUTCDate() + 7); else t.setUTCMonth(t.getUTCMonth() + 1); return t.toISOString().slice(0, 10); };
+  async function draftRecurring(r) {
+    const { id, every, active, nextRunAt, runs, createdAt, lastRunAt, ...invoice } = r;
+    const p = store.addPending({ id: store.id('act'), type: 'create_invoice', status: 'PENDING', source: 'recurring', createdAt: new Date().toISOString(),
+      data: { ...invoice, description: `${invoice.description} (${every === 'week' ? 'week' : 'month'} of ${nextRunAt})`, recurringId: id } });
+    r.runs = (r.runs || 0) + 1; r.lastRunAt = nextRunAt; r.nextRunAt = addPeriod(nextRunAt, every);
+    store.save();
+    store.audit('scheduler', 'recurring_invoice_drafted', { scheduleId: id, client: invoice.clientName, amount: invoice.amount, next: r.nextRunAt });
+    await autopilot([p.id]);
+    return p.id;
+  }
+  async function runRecurring(now = Date.now()) {
+    const today = new Date(now).toISOString().slice(0, 10);
+    const drafted = [];
+    for (const r of store.db.recurring || []) if (r.active && r.nextRunAt <= today) drafted.push(await draftRecurring(r));
+    return drafted;
+  }
+  app.post('/api/recurring/:id/run', wrap(async (req, res) => {
+    const r = (store.db.recurring || []).find((x) => x.id === req.params.id);
+    if (!r) return res.status(404).json({ error: 'Schedule not found' });
+    if (!r.active) return res.status(409).json({ error: 'Schedule is paused' });
+    const pid = await draftRecurring(r);
+    res.json({ proposal: store.getPending(pid), state: view() });
+  }));
+  app.post('/api/recurring/:id/toggle', (req, res) => {
+    const r = (store.db.recurring || []).find((x) => x.id === req.params.id);
+    if (!r) return res.status(404).json({ error: 'Schedule not found' });
+    r.active = !r.active; store.save();
+    store.audit('user', r.active ? 'recurring_resumed' : 'recurring_paused', { scheduleId: r.id, client: r.clientName });
+    res.json({ state: view() });
+  });
+
   app.get('/api/autopilot', (req, res) => res.json({ policy: normalizePolicy(store.db.policy), hard: HARD, spentToday: autoSpentToday(store.db.audit) }));
   app.post('/api/autopilot', (req, res) => {
     const before = normalizePolicy(store.db.policy);
@@ -303,9 +345,9 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
   });
   app.post('/api/demo/seed', demoOnly, (req, res) => { seedDemo(store); res.json(view()); });
   app.get('/demo-pay/:paypalId', demoOnly, (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'demo-pay.html')));
-  app.post('/api/reset', (req, res) => { store.reset(); store.db.policy = undefined; store.db.payouts = []; chatHistory = []; store.audit('user', 'reset', {}); res.json(view()); });
+  app.post('/api/reset', (req, res) => { store.reset(); store.db.policy = undefined; store.db.recurring = []; store.db.payouts = []; chatHistory = []; store.audit('user', 'reset', {}); res.json(view()); });
 
-  app.locals = { store, runDueReminders, applyEvent };
+  app.locals = { store, runDueReminders, applyEvent, runRecurring };
   return app;
 }
 

@@ -88,7 +88,9 @@ function demo() {
       const reminders = remMatch ? (remWord[remMatch[1]] ?? Number(remMatch[2])) : (/\bremind/.test(lower) ? 1 : 1);
       const desc = t.match(/\bfor\s+(?:the\s+)?(.+?)(?:,|\.|\s+net\b|\s+due\b|\s+remind\b|$)/i)?.[1] || 'Professional services';
       const slug = (name || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '');
-      return [{ name: 'create_invoice', args: {
+      const rec = lower.match(/\b(?:every\s+(week|month)|(week|month)ly|retainer)\b/);
+      return [{ name: rec ? 'schedule_recurring_invoice' : 'create_invoice', args: {
+        ...(rec ? { every: rec[1] || rec[2] || 'month' } : {}),
         client_name: name || '', client_email: email || `billing@${slug}.example.com`,
         amount: amt ? Number(amt[1].replace(/,/g, '')) : NaN, currency: amt?.[2] ? (cur[amt[2].toLowerCase()] || amt[2].toUpperCase()) : 'USD',
         description: desc.replace(/^(?:the\s+)/i, ''), net_days: net, reminders,
@@ -128,6 +130,7 @@ function demo() {
       const u = r.unmatched.map((x) => `• ${x.amount} from ${x.payer || 'unknown'} on ${x.date}: no matching invoice`);
       return `I checked ${r.scanned} incoming PayPal payment(s).` + (s.length ? `\nPossible matches (approve to mark paid):\n${s.join('\n')}` : '\nNo new matches.') + (u.length ? `\nUnmatched:\n${u.join('\n')}` : '');
     }
+    if (name === 'schedule_recurring_invoice') return `Ready to bill ${r.preview.clientName} ${r.preview.amount} ${r.preview.currency} every ${r.preview.every} for "${r.preview.description}", starting ${r.preview.startDate}. Approve the schedule once; each invoice still follows your approval or Autopilot rules.`;
     if (name === 'pay_contractor') return `Payout ready: ${r.preview.amount} ${r.preview.currency} to ${r.preview.recipientEmail} for "${r.preview.note}". No money moves until you approve.`;
     if (name === 'cancel_invoice') return `Ready to cancel invoice #${r.preview.number} for ${r.preview.clientName}. Approve to confirm.`;
     if (name === 'list_invoices') return r.invoices.length ? `You have ${r.invoices.length} matching invoice(s):\n` + r.invoices.map((i) => `• #${i.number} ${i.client}: ${i.amount} ${i.currency} (${i.status})`).join('\n') : 'No matching invoices yet.';

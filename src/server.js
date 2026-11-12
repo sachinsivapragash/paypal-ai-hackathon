@@ -3,7 +3,7 @@ const { createApp } = require('./app');
 
 const app = createApp(config);
 // Check for due reminders every 5 minutes.
-setInterval(() => app.locals.runDueReminders().catch(() => {}), 5 * 60_000).unref();
+setInterval(() => { app.locals.runDueReminders().catch(() => {}); app.locals.runRecurring().catch(() => {}); }, 5 * 60_000).unref();
 
 app.listen(config.port, () => {
   console.log(`DuePilot running on http://localhost:${config.port}`);

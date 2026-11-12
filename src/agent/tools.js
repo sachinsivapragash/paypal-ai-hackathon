@@ -36,6 +36,24 @@ const declarations = [
     },
   },
   {
+    name: 'schedule_recurring_invoice',
+    description: 'Set up a recurring invoice (retainer) that repeats every week or month, e.g. "invoice Kestrel $500 every month for maintenance". Needs approval once; afterwards each period\'s invoice is drafted automatically and still follows approval/Autopilot rules.',
+    parameters: {
+      type: 'object',
+      properties: {
+        client_name: { type: 'string' },
+        client_email: { type: 'string' },
+        amount: { type: 'number', description: 'Amount per period' },
+        currency: { type: 'string', description: 'default USD' },
+        description: { type: 'string', description: 'What the retainer covers' },
+        every: { type: 'string', description: '"week" or "month"' },
+        start_date: { type: 'string', description: 'YYYY-MM-DD of the first invoice; default today' },
+        net_days: { type: 'integer', description: 'Payment terms in days, default 7' },
+      },
+      required: ['client_name', 'client_email', 'amount', 'description', 'every'],
+    },
+  },
+  {
     name: 'send_reminder',
     description: 'Prepare a polite payment reminder for an unpaid invoice. Write the reminder text yourself in "message". Needs user approval.',
     parameters: {
@@ -215,6 +233,16 @@ function runTool(name, args, { store, config, allowedTools, source }) {
       const p = store.addPending({ id: store.id('act'), type: 'create_invoice', status: 'PENDING', source: source || 'chat', createdAt: new Date().toISOString(), data: value });
       store.audit('agent', 'proposed_invoice', { pendingId: p.id, ...value });
       return { ok: true, pending_approval: p.id, preview: value, note: 'Shown to the user for approval. Not sent yet.' };
+    }
+    case 'schedule_recurring_invoice': {
+      const { errors, value } = validateInvoice(args || {}, config.maxInvoiceAmount);
+      const every = String(args?.every || 'month').toLowerCase().replace(/ly$/, '').replace(/^monthl$/, 'month');
+      if (!['week', 'month'].includes(every)) errors.push('repeat must be every week or every month');
+      if (errors.length) return { ok: false, errors };
+      const data = { ...value, every, startDate: /^\d{4}-\d{2}-\d{2}$/.test(String(args?.start_date || '')) ? args.start_date : new Date().toISOString().slice(0, 10) };
+      const p = store.addPending({ id: store.id('act'), type: 'create_recurring', status: 'PENDING', source: source || 'chat', createdAt: new Date().toISOString(), data });
+      store.audit('agent', 'proposed_recurring', { pendingId: p.id, client: data.clientName, amount: data.amount, every });
+      return { ok: true, pending_approval: p.id, preview: data, note: 'Once approved, DuePilot drafts this invoice every period; each one still goes through approval or Autopilot rules.' };
     }
     case 'send_reminder':
     case 'cancel_invoice': {

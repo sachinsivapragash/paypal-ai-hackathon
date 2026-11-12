@@ -16,14 +16,15 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 function scrollChat() { const m = $('#messages'); requestAnimationFrame(() => { m.scrollTop = m.scrollHeight; }); }
 function addMsg(text, cls) { const d = document.createElement('div'); d.className = `msg ${cls}`; d.textContent = text; $('#messages').append(d); scrollChat(); return d; }
 
-const LABEL = { create_invoice: '🧾 Send PayPal invoice', send_reminder: '🔔 Send reminder', cancel_invoice: '✖ Cancel invoice', pay_contractor: '💸 PayPal payout', record_payment: '🔎 Match payment to invoice' };
-const APPROVE = { create_invoice: 'Approve & send via PayPal', send_reminder: 'Approve & send reminder', cancel_invoice: 'Approve cancellation', pay_contractor: 'Approve payout', record_payment: 'Approve & mark paid' };
-const SAFE = { create_invoice: 'Nothing has been sent yet.', send_reminder: 'Nothing has been sent yet.', cancel_invoice: 'The invoice is still active.', pay_contractor: 'No money has moved. Capped at your payout limit.', record_payment: 'Nothing changes on PayPal until you approve.' };
+const LABEL = { create_invoice: '🧾 Send PayPal invoice', send_reminder: '🔔 Send reminder', cancel_invoice: '✖ Cancel invoice', pay_contractor: '💸 PayPal payout', record_payment: '🔎 Match payment to invoice', create_recurring: '🔁 Set up recurring invoice' };
+const APPROVE = { create_invoice: 'Approve & send via PayPal', send_reminder: 'Approve & send reminder', cancel_invoice: 'Approve cancellation', pay_contractor: 'Approve payout', record_payment: 'Approve & mark paid', create_recurring: 'Approve schedule' };
+const SAFE = { create_invoice: 'Nothing has been sent yet.', send_reminder: 'Nothing has been sent yet.', cancel_invoice: 'The invoice is still active.', pay_contractor: 'No money has moved. Capped at your payout limit.', record_payment: 'Nothing changes on PayPal until you approve.', create_recurring: 'No invoice is created yet. Each one will still need your approval (or Autopilot).' };
 function cardFields(p) {
   const d = p.data;
   if (p.type === 'create_invoice') return [['Client', d.clientName], ['Email', d.clientEmail], ['For', d.description],
     ...(d.items?.length ? d.items.map((it, i) => [i ? '' : 'Items', `${it.quantity} × ${it.name} @ ${fmt(it.unitAmount, d.currency)}`]) : []),
     ['Total', fmt(d.amount, d.currency)], ['Terms', `Net ${d.netDays}`], ['Auto reminders', d.reminders]];
+  if (p.type === 'create_recurring') return [['Client', d.clientName], ['Email', d.clientEmail], ['For', d.description], ['Amount', `${fmt(d.amount, d.currency)} every ${d.every}`], ['First invoice', d.startDate], ['Terms', `Net ${d.netDays}`]];
   if (p.type === 'record_payment') return [['Payment', `${fmt(d.amount, d.currency)} from ${d.payer || 'unknown'} on ${d.date}`], ['Invoice', `#${d.number} · ${d.clientName}`], ['Confidence', d.confidence], ['Why', d.reasons.join(', ')], ['PayPal txn', d.transactionId]];
   if (p.type === 'pay_contractor') return [['To', d.recipientEmail], ['Amount', fmt(d.amount, d.currency)], ['For', d.note]];
   if (p.type === 'send_reminder') return [['Invoice', `#${d.number} · ${d.clientName}`], ['Amount', fmt(d.amount, d.currency)], ['Message', d.message]];
@@ -121,6 +122,25 @@ async function showQr(id) {
   } catch (err) { $('#qrBox').innerHTML = `<p>${esc(err.message)}</p>`; }
 }
 $('#qrClose').addEventListener('click', () => $('#qrDialog').close());
+
+// ---- Recurring tab: retainers that draft an invoice every week or month ----
+function renderRecurring(list) {
+  if (!list.length) { $('#pane-recurring').innerHTML = '<div class="empty"><span class="em-ic">🔁</span><strong>No recurring invoices yet</strong>Try "Invoice Kestrel Labs finance@kestrel.example.com $500 every month for website maintenance".</div>'; return; }
+  $('#pane-recurring').innerHTML = `<div class="insight-lead muted">Each period DuePilot drafts the invoice. It then waits for your approval, unless your Autopilot rules allow it.</div>
+    <table><thead><tr><th>Client</th><th>For</th><th class="num">Amount</th><th>Every</th><th>Next</th><th class="num">Sent</th><th>Status</th><th></th></tr></thead><tbody>${list.map((r) => `
+    <tr><td>${esc(r.clientName)}</td><td>${esc(r.description)}</td><td class="num">${fmt(r.amount, r.currency)}</td><td>${esc(r.every)}</td><td>${esc(r.nextRunAt)}</td><td class="num">${r.runs || 0}</td>
+    <td><span class="status ${r.active ? 's-SENT' : 's-CANCELLED'}">${r.active ? 'ACTIVE' : 'PAUSED'}</span></td>
+    <td class="row-actions">${r.active ? `<button class="ghost small" data-rec-run="${esc(r.id)}" title="Draft this period's invoice now">Draft now</button>` : ''}<button class="ghost small" data-rec-toggle="${esc(r.id)}">${r.active ? 'Pause' : 'Resume'}</button></td></tr>`).join('')}</tbody></table>`;
+}
+$('#pane-recurring').addEventListener('click', async (e) => {
+  const run = e.target.dataset?.recRun, tog = e.target.dataset?.recToggle;
+  if (!run && !tog) return;
+  e.target.disabled = true;
+  try {
+    if (run) { const r = await api(`/api/recurring/${run}/run`, {}); setState(r.state); renderCard(r.proposal); toast(r.proposal.status === 'DONE' ? 'Invoice drafted and sent by Autopilot' : 'Invoice drafted. Approve it in the chat'); }
+    else { setState((await api(`/api/recurring/${tog}/toggle`, {})).state); }
+  } catch (err) { toast(err.message); e.target.disabled = false; }
+});
 
 // ---- Autopilot tab: standing rules the agent may act on without a click ----
 function renderAutopilot(a) {
@@ -222,6 +242,7 @@ function render() {
   renderMatching(state.reconcile);
   renderBriefing(state.briefing);
   renderAutopilot(state.autopilot);
+  renderRecurring(state.recurring || []);
   const apBadge = document.querySelector('#apBadge'); if (apBadge && state.autopilot) apBadge.innerHTML = `<i class="${state.autopilot.policy.enabled ? '' : 'off'}"></i>Autopilot <b>${state.autopilot.policy.enabled ? 'ON' : 'off'}</b>`;
 
   const pay = state.payouts;
@@ -280,7 +301,7 @@ $('#emailForm').addEventListener('submit', async (e) => {
 
 $('#seedBtn').addEventListener('click', async () => { try { setState(await api('/api/demo/seed', {})); toast('Loaded sample clients and payment history'); } catch (err) { toast(err.message); } });
 
-const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Who should I chase first?', 'Did anyone pay me outside an invoice?', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
+const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Who should I chase first?', 'Invoice Kestrel Labs finance@kestrel.example.com $500 every month for website maintenance', 'Did anyone pay me outside an invoice?', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
 $('#chips').innerHTML = CHIPS.map((c) => `<button class="chip" type="button">${esc(c.length > 34 ? c.slice(0, 32) + '…' : c)}</button>`).join('');
 $('#chips').querySelectorAll('.chip').forEach((b, i) => b.addEventListener('click', () => { $('#chatInput').value = CHIPS[i]; $('#chatInput').focus(); }));
 
