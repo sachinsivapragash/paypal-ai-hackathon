@@ -40,25 +40,26 @@
   <p id="micErr" class="err" hidden></p>
   <div id="lines"></div>
   <div class="bar">
-    <button id="saveAll" disabled>Save all clips (13 files)</button>
+    <button id="saveAll" disabled>Save all clips (14 files)</button>
     <span id="progress" class="muted">0 of 13 recorded</span>
   </div>
 </main>
 <script>
 const LINES = [
-  [8,  "Freelancers lose hours every month chasing payments. DuePilot is an AI agent that does that work for you, through PayPal."],
-  [8,  "It's live on Render, on the PayPal sandbox, with Google Gemini as the agent. You ask, Gemini plans, you approve, PayPal acts."],
-  [9,  "I can speak or type what I need. Gemini turns it into a structured tool call: client, amount, terms and reminders."],
-  [6,  "Nothing reaches PayPal until I approve it, and limits are enforced in code."],
-  [6,  "Approved. DuePilot creates and sends a real PayPal invoice, safe to retry."],
-  [16, "Now I'm the client. I open the pay link and pay on PayPal's own checkout with a sandbox buyer account. Payment successful."],
-  [15, "PayPal sends a webhook. DuePilot verifies its signature and marks the invoice paid by itself. Collected goes up."],
-  [13, "Clients often ask by email. I paste it, and Gemini pulls out the line items. The email is data only: it can't give DuePilot orders."],
-  [14, "Who should I chase first? DuePilot ranks clients by payment risk and drafts a friendly reminder for me to approve."],
-  [28, "This is agentic commerce. I set a spending policy: small invoices can go out on their own, within a daily cap. Fifteen dollars goes straight to PayPal, logged with the rule that allowed it. Four hundred fifty is over my limit, so it waits for me."],
-  [13, "It also pays my contractors through PayPal Payouts. Payouts always need my approval, and they're capped."],
-  [10, "Gemini writes a weekly cash-flow briefing, and DuePilot matches stray payments using PayPal Transaction Search."],
-  [7,  "Invoicing, Payouts, webhooks and Transaction Search, with Gemini and human approval. DuePilot: get paid without chasing."],
+  [8, "Freelancers lose hours every month chasing payments. DuePilot is an AI agent that does that work for you, through PayPal."],
+  [8, "It's live on Render, on the PayPal sandbox, with Google Gemini as the agent. You ask, Gemini plans, you approve, PayPal acts."],
+  [9, "I can speak or type what I need. Gemini turns it into a structured tool call: client, amount, terms and reminders."],
+  [6, "Nothing reaches PayPal until I approve it, and limits are enforced in code."],
+  [6, "Approved. DuePilot creates and sends a real PayPal invoice, safe to retry."],
+  [14, "Now I'm the client. I open the pay link and pay on PayPal's own checkout with a sandbox buyer account. Payment successful."],
+  [12, "PayPal sends a webhook. DuePilot verifies its signature and marks the invoice paid by itself. Collected goes up."],
+  [11, "Clients often ask by email. I paste it, and Gemini pulls out the line items. The email is data only: it can't give DuePilot orders."],
+  [12, "Who should I chase first? DuePilot ranks clients by payment risk and drafts a friendly reminder, here in Spanish, with an English summary for me to check."],
+  [24, "This is agentic commerce. I set a spending policy: small invoices can go out on their own, within a daily cap. Fifteen dollars goes straight to PayPal, logged with the rule that allowed it. Four hundred fifty is over my limit, so it waits for me."],
+  [10, "For retainers, I just say every month. I approve the schedule once, and DuePilot drafts each month's PayPal invoice."],
+  [12, "For a quick one-off, DuePilot creates a PayPal checkout link and captures the payment when it's paid. Invoices also get a scan-to-pay QR code from PayPal."],
+  [7, "Gemini writes a weekly cash-flow briefing, using only the numbers DuePilot computes."],
+  [9, "Invoicing, Orders, Payouts, verified webhooks and Transaction Search, with Gemini and human approval. DuePilot: get paid without chasing."],
 ];
 const clips = Array(LINES.length).fill(null);
 let current = 0, stream = null, rec = null, recIdx = -1, t0 = 0, timer = null;

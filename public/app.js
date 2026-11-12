@@ -126,7 +126,7 @@ $('#qrClose').addEventListener('click', () => $('#qrDialog').close());
 
 // ---- Requests tab: one-off PayPal checkout links (Orders API) ----
 function renderRequests(list) {
-  if (!list.length) { $('#pane-requests').innerHTML = '<div class="empty"><span class="em-ic">💳</span><strong>No payment requests yet</strong>Try "Request $40 from Sam Rivera for the logo tweak". DuePilot creates a PayPal checkout link and captures the payment when it's paid.</div>'; return; }
+  if (!list.length) { $('#pane-requests').innerHTML = '<div class="empty"><span class="em-ic">💳</span><strong>No payment requests yet</strong>Try "Request $40 from Sam Rivera for the logo tweak". DuePilot creates a PayPal checkout link and captures the payment once it is paid.</div>'; return; }
   $('#pane-requests').innerHTML = `<table><thead><tr><th>From</th><th>For</th><th class="num">Amount</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>${list.map((r) => `
     <tr><td>${esc(r.payerName)}</td><td>${esc(r.note)}</td><td class="num">${fmt(r.amount, r.currency)}</td>
     <td><span class="status ${r.status === 'PAID' ? 's-PAID' : 's-SENT'}">${r.status === 'PAID' ? 'PAID' : 'AWAITING'}</span></td>

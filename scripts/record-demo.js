@@ -92,7 +92,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const lastCard = () => page.locator('.card').last();
 
   await page.goto(APP);
-  await page.waitForSelector('#kpis .kpi');
+  await page.waitForSelector('#kpis .kpi', { timeout: 120000 });
   await sleep(1500);
 
   scene('1 hero');
@@ -156,7 +156,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   scene('7 webhook marks it paid');
   await page.goto(APP);
-  await page.waitForSelector('#kpis .kpi');
+  await page.waitForSelector('#kpis .kpi', { timeout: 120000 });
   await sleep(1000);
   await point(page.locator('#kpis'));
   await page.locator('#grid').scrollIntoViewIfNeeded();
@@ -187,7 +187,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   scene('9 chase and remind');
   await waited(() => sleep(4000)); // Gemini free-tier pacing (cut from the video)
-  await send('Who should I chase first? Draft them a friendly reminder.');
+  await send('Who should I chase first? Draft them a friendly reminder in Spanish.');
   await click(page.locator('[data-tab="insights"]'));
   await sleep(2500);
   const remindCard = lastCard();
@@ -220,18 +220,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await point(lastCard());
   await sleep(3500);
 
-  scene('11 pay a contractor');
-  await waited(() => sleep(4000)); // Gemini pacing (cut)
-  await send(`Pay ${BUYER} 20 USD for illustration work`);
-  const payCard = lastCard();
-  await point(payCard);
+  scene('11 recurring retainer');
+  await send('Bill Kestrel Labs finance@kestrel.example.com $500 every month for website maintenance');
+  const recCard = lastCard();
+  await point(recCard);
   await sleep(2000);
-  await click(payCard.getByRole('button', { name: /Approve/ }));
-  await waited(() => sleep(1800)); await sleep(1500);
-  await click(page.locator('[data-tab="payouts"]'));
+  const recBtn = recCard.getByRole('button', { name: /Approve/ });
+  if (await recBtn.count()) { await click(recBtn); await waited(() => sleep(1500)); }
+  await click(page.locator('[data-tab="recurring"]'));
   await sleep(2500);
 
-  scene('12 briefing and matching');
+  scene('12 payment request and QR');
+  await send('Request $40 from Sam Rivera for the logo tweak');
+  const reqCard = lastCard();
+  await point(reqCard);
+  await sleep(1800);
+  const reqBtn = reqCard.getByRole('button', { name: /Approve/ });
+  if (await reqBtn.count()) { await click(reqBtn); await waited(() => reqCard.getByRole('link', { name: /checkout link/i }).waitFor({ timeout: 60000 }).catch(() => {})); }
+  await sleep(1200);
+  await click(page.locator('[data-tab="requests"]'));
+  await sleep(2000);
+  // Scan-to-pay: PayPal-generated QR code for an unpaid invoice.
+  await click(page.locator('[data-tab="invoices"]'));
+  await sleep(800);
+  const qrBtn = page.locator('[data-qr]').first();
+  if (await qrBtn.count()) {
+    await click(qrBtn);
+    await waited(() => page.locator('#qrBox img').waitFor({ timeout: 30000 }).catch(() => {}));
+    await sleep(3000);
+    await click(page.locator('#qrClose'));
+  }
+  await sleep(600);
+
+  scene('13 briefing');
   const gen = page.getByRole('button', { name: /Generate briefing/ });
   if (await gen.count()) {
     await click(gen);
@@ -241,11 +262,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   await sleep(800);
   await point(page.locator('#briefing'));
-  await sleep(6000);
-  await click(page.locator('[data-tab="matching"]'));
-  await sleep(4000);
+  await sleep(5000);
 
-  scene('13 closing');
+  scene('14 closing');
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
   await point(page.locator('#heroTitle'));
   await sleep(6000);

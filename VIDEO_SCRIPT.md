@@ -11,7 +11,7 @@
 5. Do one full dry run. Then **Reset** again before the real take.
 
 ## Voice clips (recorded video + your voice)
-The screen video is recorded automatically (`npm run video:record`). Record **one voice clip per scene**, name it by number (`01.m4a` … `13.m4a`), put them in `video/audio/`, then run `npm run video:build`. Each scene is fitted to its clip, so aim for the target lengths below (total about 2:35).
+The screen video is recorded automatically (`npm run video:record`). Record **one voice clip per scene**, name it by number (`01.m4a` … `14.m4a`), put them in `video/audio/`, then run `npm run video:build`. Each scene is fitted to its clip, so aim for the target lengths below (total about 2:28).
 
 | # | Scene | Target | Say |
 |---|---|---|---|
@@ -20,14 +20,15 @@ The screen video is recorded automatically (`npm run video:record`). Record **on
 | 03 | Ask (voice or text) | 9s | "I can speak or type what I need. Gemini turns it into a structured tool call: client, amount, terms and reminders." |
 | 04 | Approval card | 6s | "Nothing reaches PayPal until I approve it, and limits are enforced in code." |
 | 05 | Approve and send | 6s | "Approved. DuePilot creates and sends a real PayPal invoice, safe to retry." |
-| 06 | Client pays | 16s | "Now I'm the client. I open the pay link and pay on PayPal's own checkout with a sandbox buyer account. Payment successful." |
-| 07 | Webhook → PAID | 15s | "PayPal sends a webhook. DuePilot verifies its signature and marks the invoice paid by itself. Collected goes up." |
-| 08 | Invoice from an email | 13s | "Clients often ask by email. I paste it, and Gemini pulls out the line items. The email is data only: it can't give DuePilot orders." |
-| 09 | Chase and remind | 14s | "Who should I chase first? DuePilot ranks clients by payment risk and drafts a friendly reminder for me to approve." |
-| 10 | Autopilot | 28s | "This is agentic commerce. I set a spending policy: small invoices can go out on their own, within a daily cap. Fifteen dollars goes straight to PayPal, logged with the rule that allowed it. Four hundred fifty is over my limit, so it waits for me." |
-| 11 | Pay a contractor | 13s | "It also pays my contractors through PayPal Payouts. Payouts always need my approval, and they're capped." |
-| 12 | Briefing and matching | 10s | "Gemini writes a weekly cash-flow briefing, and DuePilot matches stray payments using PayPal Transaction Search." |
-| 13 | Closing | 7s | "Invoicing, Payouts, webhooks and Transaction Search, with Gemini and human approval. DuePilot: get paid without chasing." |
+| 06 | Client pays | 14s | "Now I'm the client. I open the pay link and pay on PayPal's own checkout with a sandbox buyer account. Payment successful." |
+| 07 | Webhook → PAID | 12s | "PayPal sends a webhook. DuePilot verifies its signature and marks the invoice paid by itself. Collected goes up." |
+| 08 | Invoice from an email | 11s | "Clients often ask by email. I paste it, and Gemini pulls out the line items. The email is data only: it can't give DuePilot orders." |
+| 09 | Chase + reminder in Spanish | 12s | "Who should I chase first? DuePilot ranks clients by payment risk and drafts a friendly reminder, here in Spanish, with an English summary for me to check." |
+| 10 | Autopilot | 24s | "This is agentic commerce. I set a spending policy: small invoices can go out on their own, within a daily cap. Fifteen dollars goes straight to PayPal, logged with the rule that allowed it. Four hundred fifty is over my limit, so it waits for me." |
+| 11 | Recurring retainer | 10s | "For retainers, I just say every month. I approve the schedule once, and DuePilot drafts each month's PayPal invoice." |
+| 12 | Payment request + QR | 12s | "For a quick one-off, DuePilot creates a PayPal checkout link and captures the payment when it's paid. Invoices also get a scan-to-pay QR code from PayPal." |
+| 13 | Briefing | 7s | "Gemini writes a weekly cash-flow briefing, using only the numbers DuePilot computes." |
+| 14 | Closing | 9s | "Invoicing, Orders, Payouts, verified webhooks and Transaction Search, with Gemini and human approval. DuePilot: get paid without chasing." |
 
 ## Shots
 
