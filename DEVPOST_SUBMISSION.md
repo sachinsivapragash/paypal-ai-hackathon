@@ -66,7 +66,7 @@ node.js, express, javascript, ag-grid, html, css, paypal-invoicing-api, paypal-p
 ## Links
 - Live demo: https://duepilot-4f2q.onrender.com
 - Repo: https://github.com/sachinsivapragash/paypal-ai-hackathon
-- Video: <https://youtu.be/...>
+- Video: https://youtu.be/RRMXGWukvaQ
 
 ## Testing instructions for judges
 1. Open the live demo. No login needed. Header badges show whether PayPal is **Sandbox** and which AI provider is active.

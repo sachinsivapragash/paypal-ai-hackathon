@@ -2,7 +2,7 @@
 
 > Tell it who owes you money in plain English. DuePilot drafts the PayPal invoice, waits for your approval, sends it, chases payment with polite reminders, reconciles the payment from PayPal webhooks, and pays your contractors via PayPal Payouts, all under spending caps with a full audit log.
 
-**Live demo:** https://duepilot-4f2q.onrender.com · **Video:** `<YouTube link>` · **License:** MIT
+**Live demo:** https://duepilot-4f2q.onrender.com · **Video:** https://youtu.be/RRMXGWukvaQ · **License:** MIT
 
 ## The problem
 Freelancers and micro-businesses, especially solo workers billing international clients from places like India, lose hours every month on admin: writing invoices, remembering who hasn't paid, sending awkward follow-ups, and matching payments to invoices. Most stop chasing after one reminder. Late payment is a cash-flow problem, not an accounting problem.
