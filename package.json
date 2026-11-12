@@ -10,7 +10,8 @@
     "test": "node --test test/*.test.js",
     "setup": "npm install && node -e \"require('fs').existsSync('.env')||require('fs').copyFileSync('.env.example','.env')\"",
     "video:record": "node scripts/record-demo.js",
-    "video:build": "node scripts/assemble-video.js"
+    "video:build": "node scripts/assemble-video.js",
+    "video:voice": "node scripts/import-voice.js && node scripts/assemble-video.js"
   },
   "engines": {
     "node": ">=20"

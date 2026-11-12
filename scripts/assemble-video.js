@@ -33,10 +33,23 @@ if (meta.popup) {
 const scenes = meta.scenes.filter((s) => s.name !== 'end');
 const endAt = meta.scenes.find((s) => s.name === 'end')?.at ?? duration(raw);
 const audioDir = path.join(DIR, 'audio');
+// Clean up a voice clip recorded on a laptop or phone: trim silence at both ends, cut low rumble,
+// reduce steady background noise, and level the loudness to YouTube's standard (-16 LUFS).
+const CLEAN = [
+  'highpass=f=70',
+  'afftdn=nf=-25',
+  'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.12',
+  'areverse', 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.25', 'areverse',
+  'loudnorm=I=-16:TP=-1.5:LRA=11',
+  'aresample=48000',
+].join(',');
 const audioFor = (n) => {
   if (!fs.existsSync(audioDir)) return null;
   const f = fs.readdirSync(audioDir).find((x) => new RegExp(`^0?${n}[^0-9]`).test(x));
-  return f ? path.join(audioDir, f) : null;
+  if (!f) return null;
+  const clean = path.join(tmp, `voice${n}.wav`);
+  run(['-i', path.join(audioDir, f), '-af', CLEAN, '-ac', '1', clean]);
+  return clean;
 };
 const lines = [];
 const parts = [];
