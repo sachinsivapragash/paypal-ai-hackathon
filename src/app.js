@@ -220,6 +220,32 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     res.json(applyEvent(event, 'paypal-webhook'));
   }));
 
+  // "Scan to pay": PayPal-generated QR code for an open invoice (cached; PayPal is called once per invoice).
+  const qrCache = new Map();
+  app.get('/api/invoices/:id/qr', wrap(async (req, res) => {
+    const inv = store.db.invoices.find((i) => i.id === req.params.id);
+    if (!inv) return res.status(404).json({ error: 'Invoice not found' });
+    if (!['SENT', 'OVERDUE'].includes(effectiveStatus(inv))) return res.status(409).json({ error: `Invoice #${inv.number} is ${effectiveStatus(inv)}; only unpaid invoices have a pay QR code` });
+    if (!qrCache.has(inv.paypalId)) qrCache.set(inv.paypalId, (await paypal.invoiceQrCode(inv.paypalId)).png);
+    store.audit('user', 'qr_code_viewed', { number: inv.number });
+    res.json({ number: inv.number, client: inv.clientName, amount: inv.amount, currency: inv.currency, payLink: inv.payLink, png: qrCache.get(inv.paypalId) });
+  }));
+
+  // CSV exports for an accountant: invoices and the full audit trail.
+  const csv = (rows) => rows.map((r) => r.map((v) => {
+    let s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // neutralise spreadsheet formula injection
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(',')).join('\r\n') + '\r\n';
+  const sendCsv = (res, name, rows) => { res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', `attachment; filename="${name}"`); res.send('﻿' + csv(rows)); };
+  app.get('/api/export/invoices.csv', (req, res) => sendCsv(res, `duepilot-invoices-${new Date().toISOString().slice(0, 10)}.csv`, [
+    ['number', 'client', 'client_email', 'description', 'amount', 'currency', 'status', 'due_date', 'sent_at', 'paid_at', 'reminders_sent', 'paypal_invoice_id', 'matched_transaction'],
+    ...store.db.invoices.map((i) => [i.number, i.clientName, i.clientEmail, i.description, i.amount, i.currency, effectiveStatus(i), i.dueDate, i.sentAt, i.paidAt, i.remindersSent || 0, i.paypalId, i.matchedTransaction]),
+  ]));
+  app.get('/api/export/audit.csv', (req, res) => sendCsv(res, `duepilot-audit-${new Date().toISOString().slice(0, 10)}.csv`, [
+    ['time', 'actor', 'action', 'details'], ...store.db.audit.map((a) => [a.at, a.actor, a.action, a.details]),
+  ]));
+
   // Fallback reconciliation: pull status from PayPal (useful if a webhook was missed).
   app.post('/api/invoices/:id/sync', wrap(async (req, res) => {
     const inv = store.db.invoices.find((i) => i.id === req.params.id);

@@ -74,6 +74,7 @@
         </div>
         <div class="tab-tools">
           <button class="ghost small hidden" id="seedBtn" title="Load sample clients and payment history (demo mode only)">Load sample data</button>
+          <a class="btnlink small" id="csvBtn" href="/api/export/invoices.csv" title="Download invoices as CSV for your accountant">⬇ CSV</a>
           <button class="ghost small" id="remindBtn" title="Send any reminders that are due now">Run reminders</button>
         </div>
       </div>
@@ -104,6 +105,12 @@
         <button type="submit" id="emailSubmit">Draft invoice</button>
       </div>
     </form>
+  </dialog>
+  <dialog id="qrDialog" aria-labelledby="qrTitle">
+    <h2 id="qrTitle">Scan to pay</h2>
+    <p class="muted" id="qrSub"></p>
+    <div class="qrbox" id="qrBox"></div>
+    <div class="dialog-actions"><a class="btnlink" id="qrLink" target="_blank" rel="noopener">Open pay link ↗</a><span class="push"></span><button type="button" class="ghost" id="qrClose">Close</button></div>
   </dialog>
   <div class="toast" id="toast" role="status"></div>
   <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/dist/ag-grid-community.min.js"></script>

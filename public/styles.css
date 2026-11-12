@@ -197,6 +197,12 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; } th.num { text-
 .switch input:disabled + span { opacity: .5; cursor: not-allowed; }
 .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+a.btnlink { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 10px 16px; font-weight: 500; font-size: 15px; }
+a.btnlink.small { padding: 6px 12px; font-size: 13px; border-radius: 9px; }
+a.btnlink:hover { background: var(--surface-2); }
+.qrbox { display: grid; place-items: center; min-height: 260px; background: #fff; border-radius: 14px; border: 1px solid var(--border); margin: 6px 0 4px; }
+.qrbox img { width: 240px; height: 240px; image-rendering: pixelated; }
+.qrbox p { color: #5d6479; padding: 20px; text-align: center; }
 /* Dialog */
 dialog { border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--text); padding: 22px; width: min(580px, calc(100vw - 32px)); box-shadow: 0 30px 80px rgba(0,0,0,.3); }
 dialog::backdrop { background: rgba(10, 12, 20, .5); backdrop-filter: blur(2px); }
