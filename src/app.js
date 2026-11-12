@@ -13,6 +13,9 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
   paypal = paypal || createPayPal(config.paypal, { demo: config.paypalDemo });
   provider = provider || createProvider(config);
   const app = express();
+  app.set('trust proxy', true); // Render sits behind a proxy: use the public https origin for PayPal return URLs
+  let publicOrigin = config.publicUrl || null;
+  app.use((req, res, next) => { if (!config.publicUrl && req.get('host')) publicOrigin = `${req.protocol}://${req.get('host')}`; next(); });
   app.use(express.json({ limit: '200kb' }));
   app.use(express.static(path.join(__dirname, '..', 'public')));
   let chatHistory = [];
@@ -26,6 +29,7 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     insights: clientInsights(store.db.invoices),
     reconcile: store.db.lastReconcile || null,
     recurring: store.db.recurring || [],
+    requests: store.db.requests || [],
     briefing: store.db.lastBriefing || null,
     autopilot: { policy: normalizePolicy(store.db.policy), spentToday: autoSpentToday(store.db.audit) },
   });
@@ -120,6 +124,15 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
       await paypal.recordPayment(inv.paypalId, d, key('record'));
       store.upsertInvoice({ id: inv.id, status: 'PAID', paidAt: new Date(d.date + 'T12:00:00Z').toISOString(), remindersLeft: 0, matchedTransaction: d.transactionId });
       return { number: inv.number, transactionId: d.transactionId };
+    }
+    if (p.type === 'create_payment_request') {
+      store.db.requests = store.db.requests || [];
+      const reqId = store.id('req');
+      const origin = publicOrigin || `http://localhost:${config.port}`;
+      const o = await paypal.createOrder({ ...d, requestId: reqId, returnUrl: `${origin}/api/pay/return`, cancelUrl: `${origin}/?request=cancelled` }, key('order'));
+      store.db.requests.unshift({ id: reqId, ...d, orderId: o.orderId, approveUrl: o.approveUrl, status: 'AWAITING_PAYMENT', createdAt: new Date().toISOString() });
+      store.save();
+      return { requestId: reqId, payLink: o.approveUrl, orderId: o.orderId };
     }
     if (p.type === 'create_recurring') {
       const { every, startDate, ...invoice } = d;
@@ -233,6 +246,19 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
   });
 
   // ---- Webhooks: verified, de-duplicated, auto-reconciled ----
+  // Capture an approved PayPal order and mark the payment request paid. Safe to call more than once.
+  async function captureRequest(orderId, actor) {
+    const r = (store.db.requests || []).find((x) => x.orderId === orderId);
+    if (!r) return { ok: false, error: 'unknown order' };
+    if (r.status === 'PAID') return { ok: true, duplicate: true, request: r };
+    const c = await paypal.captureOrder(orderId, `duepilot-${r.id}-capture`);
+    if (c.status !== 'COMPLETED') throw new Error(`PayPal capture status ${c.status}`);
+    Object.assign(r, { status: 'PAID', paidAt: new Date().toISOString(), captureId: c.captureId || r.captureId, paidBy: c.payerEmail || r.paidBy });
+    store.save();
+    store.audit(actor, 'payment_request_captured', { requestId: r.id, orderId, amount: r.amount, currency: r.currency, captureId: r.captureId });
+    return { ok: true, request: r };
+  }
+
   function applyEvent(event, actor) {
     if (store.seenWebhook(event.id)) return { duplicate: true };
     store.markWebhook(event.id);
@@ -242,6 +268,13 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
     if (event.event_type === 'INVOICING.INVOICE.PAID' && inv) {
       store.upsertInvoice({ id: inv.id, status: 'PAID', paidAt: new Date().toISOString(), remindersLeft: 0 });
       store.audit(actor, 'reconciled_payment', { number: inv.number, amount: inv.amount, currency: inv.currency });
+    } else if (event.event_type === 'CHECKOUT.ORDER.APPROVED' && (store.db.requests || []).some((x) => x.orderId === r.id)) {
+      captureRequest(r.id, actor).catch((e) => store.audit('system', 'capture_failed', { orderId: r.id, message: e.message }));
+    } else if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      const orderId = r.supplementary_data?.related_ids?.order_id;
+      const pr = (store.db.requests || []).find((x) => x.orderId === orderId);
+      if (pr && pr.status !== 'PAID') { Object.assign(pr, { status: 'PAID', paidAt: new Date().toISOString(), captureId: r.id }); store.save(); store.audit(actor, 'payment_request_captured', { requestId: pr.id, orderId, amount: pr.amount }); }
+      else store.audit(actor, 'webhook_ignored', { type: event.event_type });
     } else if (event.event_type === 'INVOICING.INVOICE.CANCELLED' && inv) {
       store.upsertInvoice({ id: inv.id, status: 'CANCELLED', remindersLeft: 0 });
       store.audit(actor, 'invoice_cancelled', { number: inv.number });
@@ -260,6 +293,14 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
       return res.status(401).json({ error: 'invalid signature' });
     }
     res.json(applyEvent(event, 'paypal-webhook'));
+  }));
+
+  // PayPal sends the client back here after they approve the checkout; capture right away.
+  app.get('/api/pay/return', wrap(async (req, res) => {
+    const orderId = String(req.query.token || '');
+    if (!orderId) return res.redirect('/?request=missing');
+    try { const r = await captureRequest(orderId, 'paypal-return'); res.redirect(r.ok ? '/?request=paid' : '/?request=unknown'); }
+    catch (e) { store.audit('system', 'capture_failed', { orderId, message: e.message }); res.redirect('/?request=failed'); }
   }));
 
   // "Scan to pay": PayPal-generated QR code for an open invoice (cached; PayPal is called once per invoice).
@@ -339,13 +380,14 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
 
   // ---- Demo-only helpers (disabled when real sandbox keys are configured) ----
   const demoOnly = (req, res, next) => (config.paypalDemo ? next() : res.status(404).json({ error: 'Demo endpoints are off in sandbox mode' }));
-  app.post('/api/demo/pay/:paypalId', demoOnly, (req, res) => {
+  app.post('/api/demo/pay/:paypalId', demoOnly, wrap(async (req, res) => {
+    if (req.params.paypalId.startsWith('DEMO-ORDER-')) return res.json({ ...(await captureRequest(req.params.paypalId, 'demo-checkout')), state: view() });
     const out = applyEvent({ id: `WH-DEMO-${Date.now()}`, event_type: 'INVOICING.INVOICE.PAID', resource: { invoice: { id: req.params.paypalId } } }, 'demo-webhook');
     res.json({ ...out, state: view() });
-  });
+ }));
   app.post('/api/demo/seed', demoOnly, (req, res) => { seedDemo(store); res.json(view()); });
   app.get('/demo-pay/:paypalId', demoOnly, (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'demo-pay.html')));
-  app.post('/api/reset', (req, res) => { store.reset(); store.db.policy = undefined; store.db.recurring = []; store.db.payouts = []; chatHistory = []; store.audit('user', 'reset', {}); res.json(view()); });
+  app.post('/api/reset', (req, res) => { store.reset(); store.db.policy = undefined; store.db.recurring = []; store.db.requests = []; store.db.payouts = []; chatHistory = []; store.audit('user', 'reset', {}); res.json(view()); });
 
   app.locals = { store, runDueReminders, applyEvent, runRecurring };
   return app;

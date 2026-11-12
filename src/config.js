@@ -18,6 +18,8 @@ const config = {
     geminiFallbackModel: env.GEMINI_FALLBACK_MODEL || 'gemini-3.5-flash-lite',
   },
   maxInvoiceAmount: Number(env.MAX_INVOICE_AMOUNT) || 5000,
+  // Public origin used in PayPal return URLs (optional; otherwise taken from incoming requests).
+  publicUrl: (env.PUBLIC_URL || '').replace(/\/$/, ''),
   maxPayoutAmount: Number(env.MAX_PAYOUT_AMOUNT) || 500,
   // Sandbox buyer used to pre-fill the guided demo (a test account, not a secret).
   demoBuyerEmail: env.DEMO_BUYER_EMAIL || '',

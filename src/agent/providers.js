@@ -57,6 +57,12 @@ function demo() {
     if (intake) return parseEmail(intake[1]);
     const isInvoiceRequest = /^(please\s+)?(invoice|bill|charge)\b/.test(lower);
     if (/\b(who should i (chase|remind|follow up)|insights?|risk|late payers?|slow payers?|who pays)\b/.test(lower)) return [{ name: 'client_insights', args: {} }];
+    if (/^(please\s+)?(request|collect)\b.*\bfrom\b/.test(lower)) {
+      const amt = t.replace(EMAIL_RE, ' ').match(money);
+      const who = t.match(/\bfrom\s+([A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*)*)/)?.[1] || t.match(/\bfrom\s+([\w.'-]+)/i)?.[1] || '';
+      const note = t.match(/\bfor\s+(?:the\s+|a\s+)?(.+?)(?:[,.]|$)/i)?.[1] || 'Payment';
+      return [{ name: 'request_payment', args: { payer_name: who, payer_email: t.match(EMAIL_RE)?.[0] || '', amount: amt ? Number(amt[1].replace(/,/g, '')) : NaN, currency: amt?.[2] ? (cur[amt[2].toLowerCase()] || amt[2].toUpperCase()) : 'USD', note } }];
+    }
     if (!isInvoiceRequest && /\b(remind|nudge|follow up|chase)\b/.test(lower)) {
       const who = lower.match(/(?:remind|nudge|chase|follow up with)\s+([a-z0-9 .&'-]+?)(?:\s+about|\s+for|$|[,.!])/i)?.[1]?.trim();
       const target = who && who !== 'them' ? who : (lower.match(/#?(\d{4,})/)?.[1] || '');
@@ -130,6 +136,7 @@ function demo() {
       const u = r.unmatched.map((x) => `• ${x.amount} from ${x.payer || 'unknown'} on ${x.date}: no matching invoice`);
       return `I checked ${r.scanned} incoming PayPal payment(s).` + (s.length ? `\nPossible matches (approve to mark paid):\n${s.join('\n')}` : '\nNo new matches.') + (u.length ? `\nUnmatched:\n${u.join('\n')}` : '');
     }
+    if (name === 'request_payment') return `Ready to request ${r.preview.amount} ${r.preview.currency} from ${r.preview.payerName} for "${r.preview.note}". Approve and I'll create a PayPal checkout link to share.`;
     if (name === 'schedule_recurring_invoice') return `Ready to bill ${r.preview.clientName} ${r.preview.amount} ${r.preview.currency} every ${r.preview.every} for "${r.preview.description}", starting ${r.preview.startDate}. Approve the schedule once; each invoice still follows your approval or Autopilot rules.`;
     if (name === 'pay_contractor') return `Payout ready: ${r.preview.amount} ${r.preview.currency} to ${r.preview.recipientEmail} for "${r.preview.note}". No money moves until you approve.`;
     if (name === 'cancel_invoice') return `Ready to cancel invoice #${r.preview.number} for ${r.preview.clientName}. Approve to confirm.`;

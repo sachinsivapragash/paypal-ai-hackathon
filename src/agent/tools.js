@@ -36,6 +36,21 @@ const declarations = [
     },
   },
   {
+    name: 'request_payment',
+    description: 'Create a quick PayPal checkout link for a one-off amount, without a formal invoice (e.g. "request $40 from Sam for the logo tweak"). Use create_invoice instead when the user wants an invoice, terms or reminders. Needs approval.',
+    parameters: {
+      type: 'object',
+      properties: {
+        payer_name: { type: 'string', description: 'Who should pay' },
+        payer_email: { type: 'string', description: 'Optional email, only for your records' },
+        amount: { type: 'number' },
+        currency: { type: 'string', description: 'default USD' },
+        note: { type: 'string', description: 'What the payment is for' },
+      },
+      required: ['payer_name', 'amount', 'note'],
+    },
+  },
+  {
     name: 'schedule_recurring_invoice',
     description: 'Set up a recurring invoice (retainer) that repeats every week or month, e.g. "invoice Kestrel $500 every month for maintenance". Needs approval once; afterwards each period\'s invoice is drafted automatically and still follows approval/Autopilot rules.',
     parameters: {
@@ -235,6 +250,22 @@ function runTool(name, args, { store, config, allowedTools, source }) {
       const p = store.addPending({ id: store.id('act'), type: 'create_invoice', status: 'PENDING', source: source || 'chat', createdAt: new Date().toISOString(), data: value });
       store.audit('agent', 'proposed_invoice', { pendingId: p.id, ...value });
       return { ok: true, pending_approval: p.id, preview: value, note: 'Shown to the user for approval. Not sent yet.' };
+    }
+    case 'request_payment': {
+      const amount = Math.round(Number(args?.amount) * 100) / 100;
+      const currency = String(args?.currency || 'USD').toUpperCase();
+      const email = String(args?.payer_email || '').trim().toLowerCase();
+      const errors = [];
+      if (!args?.payer_name || String(args.payer_name).trim().length < 2) errors.push('who should pay?');
+      if (!Number.isFinite(amount) || amount <= 0) errors.push('amount must be a positive number');
+      if (amount > config.maxInvoiceAmount) errors.push(`amount exceeds the safety cap of ${config.maxInvoiceAmount}`);
+      if (!CURRENCIES.includes(currency)) errors.push(`unsupported currency ${currency}`);
+      if (email && !EMAIL.test(email)) errors.push('payer email looks invalid');
+      if (errors.length) return { ok: false, errors };
+      const data = { payerName: String(args.payer_name).trim(), payerEmail: email || null, amount, currency, note: String(args.note || 'Payment').slice(0, 120) };
+      const p = store.addPending({ id: store.id('act'), type: 'create_payment_request', status: 'PENDING', source: source || 'chat', createdAt: new Date().toISOString(), data });
+      store.audit('agent', 'proposed_payment_request', { pendingId: p.id, ...data });
+      return { ok: true, pending_approval: p.id, preview: data, note: 'After approval DuePilot creates a PayPal checkout link to share.' };
     }
     case 'schedule_recurring_invoice': {
       const { errors, value } = validateInvoice(args || {}, config.maxInvoiceAmount);

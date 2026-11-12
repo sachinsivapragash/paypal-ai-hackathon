@@ -16,14 +16,15 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.ad
 function scrollChat() { const m = $('#messages'); requestAnimationFrame(() => { m.scrollTop = m.scrollHeight; }); }
 function addMsg(text, cls) { const d = document.createElement('div'); d.className = `msg ${cls}`; d.textContent = text; $('#messages').append(d); scrollChat(); return d; }
 
-const LABEL = { create_invoice: '🧾 Send PayPal invoice', send_reminder: '🔔 Send reminder', cancel_invoice: '✖ Cancel invoice', pay_contractor: '💸 PayPal payout', record_payment: '🔎 Match payment to invoice', create_recurring: '🔁 Set up recurring invoice' };
-const APPROVE = { create_invoice: 'Approve & send via PayPal', send_reminder: 'Approve & send reminder', cancel_invoice: 'Approve cancellation', pay_contractor: 'Approve payout', record_payment: 'Approve & mark paid', create_recurring: 'Approve schedule' };
-const SAFE = { create_invoice: 'Nothing has been sent yet.', send_reminder: 'Nothing has been sent yet.', cancel_invoice: 'The invoice is still active.', pay_contractor: 'No money has moved. Capped at your payout limit.', record_payment: 'Nothing changes on PayPal until you approve.', create_recurring: 'No invoice is created yet. Each one will still need your approval (or Autopilot).' };
+const LABEL = { create_invoice: '🧾 Send PayPal invoice', send_reminder: '🔔 Send reminder', cancel_invoice: '✖ Cancel invoice', pay_contractor: '💸 PayPal payout', record_payment: '🔎 Match payment to invoice', create_recurring: '🔁 Set up recurring invoice', create_payment_request: '💳 PayPal payment request' };
+const APPROVE = { create_invoice: 'Approve & send via PayPal', send_reminder: 'Approve & send reminder', cancel_invoice: 'Approve cancellation', pay_contractor: 'Approve payout', record_payment: 'Approve & mark paid', create_recurring: 'Approve schedule', create_payment_request: 'Approve & create PayPal link' };
+const SAFE = { create_invoice: 'Nothing has been sent yet.', send_reminder: 'Nothing has been sent yet.', cancel_invoice: 'The invoice is still active.', pay_contractor: 'No money has moved. Capped at your payout limit.', record_payment: 'Nothing changes on PayPal until you approve.', create_recurring: 'No invoice is created yet. Each one will still need your approval (or Autopilot).', create_payment_request: 'No link exists yet. It is created on PayPal when you approve.' };
 function cardFields(p) {
   const d = p.data;
   if (p.type === 'create_invoice') return [['Client', d.clientName], ['Email', d.clientEmail], ['For', d.description],
     ...(d.items?.length ? d.items.map((it, i) => [i ? '' : 'Items', `${it.quantity} × ${it.name} @ ${fmt(it.unitAmount, d.currency)}`]) : []),
     ['Total', fmt(d.amount, d.currency)], ['Terms', `Net ${d.netDays}`], ['Auto reminders', d.reminders]];
+  if (p.type === 'create_payment_request') return [['From', d.payerName + (d.payerEmail ? ` · ${d.payerEmail}` : '')], ['Amount', fmt(d.amount, d.currency)], ['For', d.note], ['How', 'PayPal checkout link (Orders API)']];
   if (p.type === 'create_recurring') return [['Client', d.clientName], ['Email', d.clientEmail], ['For', d.description], ['Amount', `${fmt(d.amount, d.currency)} every ${d.every}`], ['First invoice', d.startDate], ['Terms', `Net ${d.netDays}`]];
   if (p.type === 'record_payment') return [['Payment', `${fmt(d.amount, d.currency)} from ${d.payer || 'unknown'} on ${d.date}`], ['Invoice', `#${d.number} · ${d.clientName}`], ['Confidence', d.confidence], ['Why', d.reasons.join(', ')], ['PayPal txn', d.transactionId]];
   if (p.type === 'pay_contractor') return [['To', d.recipientEmail], ['Amount', fmt(d.amount, d.currency)], ['For', d.note]];
@@ -59,7 +60,7 @@ function renderCard(p) {
         el.classList.add('done'); tag.textContent = 'done';
         el.querySelector('.safe')?.remove();
         const res = r.result || {};
-        el.querySelector('.actions').innerHTML = res.payLink ? `<a class="paylink" href="${esc(res.payLink)}" target="_blank" rel="noopener">Open PayPal pay link for #${esc(res.number)} ↗</a><span class="muted">Share it with the client, or pay it as the sandbox buyer.</span>` : res.batchId ? `<span>Payout batch <b>${esc(res.batchId)}</b> · ${esc(res.status)}</span>` : '<span>Done ✓</span>';
+        el.querySelector('.actions').innerHTML = res.payLink ? `<a class="paylink" href="${esc(res.payLink)}" target="_blank" rel="noopener">${res.number ? `Open PayPal pay link for #${esc(res.number)}` : 'Open PayPal checkout link'} ↗</a><span class="muted">Share it with the client, or pay it as the sandbox buyer.</span>` : res.batchId ? `<span>Payout batch <b>${esc(res.batchId)}</b> · ${esc(res.status)}</span>` : '<span>Done ✓</span>';
         toast(p.type === 'create_invoice' ? `Invoice #${res.number} sent via PayPal` : 'Approved and executed');
       } else { el.classList.add('rejected'); tag.textContent = 'rejected'; el.querySelector('.actions').remove(); }
     } catch (err) {
@@ -122,6 +123,24 @@ async function showQr(id) {
   } catch (err) { $('#qrBox').innerHTML = `<p>${esc(err.message)}</p>`; }
 }
 $('#qrClose').addEventListener('click', () => $('#qrDialog').close());
+
+// ---- Requests tab: one-off PayPal checkout links (Orders API) ----
+function renderRequests(list) {
+  if (!list.length) { $('#pane-requests').innerHTML = '<div class="empty"><span class="em-ic">💳</span><strong>No payment requests yet</strong>Try "Request $40 from Sam Rivera for the logo tweak". DuePilot creates a PayPal checkout link and captures the payment when it's paid.</div>'; return; }
+  $('#pane-requests').innerHTML = `<table><thead><tr><th>From</th><th>For</th><th class="num">Amount</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>${list.map((r) => `
+    <tr><td>${esc(r.payerName)}</td><td>${esc(r.note)}</td><td class="num">${fmt(r.amount, r.currency)}</td>
+    <td><span class="status ${r.status === 'PAID' ? 's-PAID' : 's-SENT'}">${r.status === 'PAID' ? 'PAID' : 'AWAITING'}</span></td>
+    <td>${esc(new Date(r.createdAt).toLocaleDateString())}</td>
+    <td class="row-actions">${r.status !== 'PAID' && r.approveUrl ? `<a href="${esc(r.approveUrl)}" target="_blank" rel="noopener">Checkout link</a><button class="ghost small" data-copy="${esc(r.approveUrl)}">Copy</button>` : r.captureId ? `<small class="muted">capture ${esc(r.captureId)}</small>` : ''}</td></tr>`).join('')}</tbody></table>`;
+}
+$('#pane-requests').addEventListener('click', async (e) => {
+  const link = e.target.dataset?.copy; if (!link) return;
+  try { await navigator.clipboard.writeText(new URL(link, location.href).href); toast('Checkout link copied'); } catch { toast('Copy failed: right-click the link instead'); }
+});
+// Back from PayPal checkout: tell the user what happened.
+(() => { const q = new URLSearchParams(location.search).get('request'); if (!q) return;
+  setTimeout(() => toast({ paid: '✅ Payment received and captured via PayPal', cancelled: 'Checkout cancelled: nothing was charged', failed: 'PayPal capture failed: see the audit log', unknown: 'Unknown checkout' }[q] || 'Back from PayPal'), 600);
+  history.replaceState(null, '', location.pathname); })();
 
 // ---- Recurring tab: retainers that draft an invoice every week or month ----
 function renderRecurring(list) {
@@ -243,6 +262,7 @@ function render() {
   renderBriefing(state.briefing);
   renderAutopilot(state.autopilot);
   renderRecurring(state.recurring || []);
+  renderRequests(state.requests || []);
   const apBadge = document.querySelector('#apBadge'); if (apBadge && state.autopilot) apBadge.innerHTML = `<i class="${state.autopilot.policy.enabled ? '' : 'off'}"></i>Autopilot <b>${state.autopilot.policy.enabled ? 'ON' : 'off'}</b>`;
 
   const pay = state.payouts;
@@ -301,7 +321,7 @@ $('#emailForm').addEventListener('submit', async (e) => {
 
 $('#seedBtn').addEventListener('click', async () => { try { setState(await api('/api/demo/seed', {})); toast('Loaded sample clients and payment history'); } catch (err) { toast(err.message); } });
 
-const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Who should I chase first?', 'Invoice Kestrel Labs finance@kestrel.example.com $500 every month for website maintenance', 'Did anyone pay me outside an invoice?', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
+const CHIPS = ['Invoice Acme Corp ap@acme.example.com 450 USD for the logo work, net 7, remind them twice', 'Who should I chase first?', 'Invoice Kestrel Labs finance@kestrel.example.com $500 every month for website maintenance', 'Request $40 from Sam Rivera for the logo tweak', 'Did anyone pay me outside an invoice?', 'Show unpaid invoices', 'Remind Acme', 'Pay maria@studio.example.com 120 USD for illustrations', 'Cash flow summary'];
 $('#chips').innerHTML = CHIPS.map((c) => `<button class="chip" type="button">${esc(c.length > 34 ? c.slice(0, 32) + '…' : c)}</button>`).join('');
 $('#chips').querySelectorAll('.chip').forEach((b, i) => b.addEventListener('click', () => { $('#chatInput').value = CHIPS[i]; $('#chatInput').focus(); }));
 
