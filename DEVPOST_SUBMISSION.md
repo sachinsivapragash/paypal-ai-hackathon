@@ -45,7 +45,7 @@ OAuth2 · Invoicing v2 (create, send, get, remind, cancel, record payment, QR co
 - **Guardrails outside the model:** all tool arguments are schema-validated in code (email, amount > 0, currency whitelist, terms 0-90 days, ≤3 reminders, invoice cap 5,000, payout cap 500); invalid calls are returned to the model as errors.
 - **Provider-agnostic:** a one-method provider interface; a keyless deterministic demo provider emits the same tool calls when no API key is set (shown as "AI: demo" in the UI).
 - Browser **Web Speech API** for voice input.
-- <If you used an AI coding assistant to help build the project, say so here, e.g. "Development was assisted by Claude Code.">
+- **Development:** built with the help of an AI coding assistant (Claude Code by Anthropic) for code, tests and documentation. Claude is not used inside the running app; the app's AI is Google Gemini, as described above.
 
 ## Challenges we ran into
 Making an agent safe enough to touch money, and then safe enough to act on its own (Autopilot): we separated "propose" from "execute", enforced caps in code rather than in prompts, and designed idempotency keys so a retry after a network error never double-bills.
