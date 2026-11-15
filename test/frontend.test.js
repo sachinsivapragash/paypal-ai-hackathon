@@ -13,6 +13,11 @@ test('frontend scripts parse', () => {
   }
 });
 
+test('VR room module parses', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'vr', 'vr.js'));
+  assert.doesNotThrow(() => execFileSync(process.execPath, ['--input-type=module', '--check'], { input: src, stdio: 'pipe' }), 'vr.js has a syntax error');
+});
+
 test('index.html: every element id used by app.js via $("#…") exists', () => {
   const pub = path.join(__dirname, '..', 'public');
   const html = fs.readFileSync(path.join(pub, 'index.html'), 'utf8');

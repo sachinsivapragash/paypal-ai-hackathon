@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DuePilot Ledger Room · VR / MR</title>
+<style>
+  :root{--bg:#0b1020;--panel:#0f1630e6;--line:#2a3558;--muted:#aab4d4;--txt:#e8ecf6;--acc:#5b8cff}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:14px system-ui,sans-serif;overflow:hidden}
+  canvas{display:block}
+  .box{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;z-index:5}
+  #hud{left:12px;top:12px;width:330px}
+  #hud h1{font-size:16px;margin:0 0 4px}
+  #hud p{margin:4px 0;color:var(--muted);font-size:13px}
+  #src{font-size:12px;color:var(--muted)}
+  #bar{left:12px;bottom:12px;right:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  #bar input{flex:1;min-width:160px;background:#141c38;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px}
+  button{background:#1b2650;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;font:inherit}
+  button:hover{border-color:var(--acc)}
+  button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+  #log{right:12px;top:12px;width:300px;max-height:45vh;overflow:auto;font-size:12px}
+  #log div{padding:3px 0;border-bottom:1px solid #1b2340}
+  @media (max-width:700px){#log{display:none}#hud{width:calc(100% - 48px)}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="hud" class="box">
+  <h1>DuePilot Ledger Room</h1>
+  <p>Your receivables as physical objects. Height = amount · colour = status (amber sent, red overdue, green paid).</p>
+  <p><b>VR/MR:</b> trigger or pinch to grab an invoice and throw it into a bin. Grab an approval tablet and drop it in the green slot to approve on PayPal.<br><b>Desktop:</b> drag with the mouse, right-drag to orbit.</p>
+  <div id="src">Connecting…</div>
+</div>
+<div id="log" class="box"></div>
+<div id="bar" class="box">
+  <button id="mic" title="Hold to talk to the Gemini agent">🎙 Talk</button>
+  <input id="say" placeholder="Ask the agent… e.g. “Invoice Acme ap@acme.com 300 USD for logos”">
+  <button id="send" class="pri">Send</button>
+  <button id="brief">📣 Briefing</button>
+  <button id="match">🔍 Match payments</button>
+  <button id="sample">Sample data</button>
+</div>
+<script type="module" src="vr.js"></script>
+</body>
+</html>
