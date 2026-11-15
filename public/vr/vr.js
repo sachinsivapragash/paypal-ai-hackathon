@@ -331,8 +331,9 @@ async function chat(message) {
   if (sample && !backendOk) { log('Offline sample mode: the agent needs the live backend.'); return; }
   const r = await api('/api/chat', { message });
   const reply = String(r.reply || '').replace(/\*\*/g, '');
-  speak(reply); log(reply);
+  speak(reply);
   if (wasSample && !r.state.invoices.length && !r.state.pending.length) { log(`${reply} (That answer is about your live account, which is empty. The room is showing sample data.)`); return; }
+  log(reply);
   if (wasSample) { sample = false; sampleWhy = ''; $('#sample').textContent = 'Sample data'; syncSampleLabel(); log('Switched to live data.'); }
   state = r.state;
   if (r.proposals?.length) log(`${r.proposals.length} approval tablet(s) are on the table. Drop one in APPROVE to send it to PayPal.`);
