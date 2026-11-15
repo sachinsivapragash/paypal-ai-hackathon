@@ -23,6 +23,7 @@ Hold your unpaid invoices in your hands: a mixed-reality cash-flow room where yo
 - **Game feel:** a collection combo meter for acting quickly, a stream of particles along the shelf that speeds up with the money outstanding, red alarm rings under overdue invoices, coin bursts, throw and impact sounds, and (on desktop) a glow effect and an opening camera fly-in.
 
 - **Works fully inside the headset:** a console of physical buttons (Chase overdue, Briefing, Match payments, Sample/Live data) sits in front of you, so nothing depends on the 2D page.
+- **Quick questions:** one-press buttons for "Who to chase?", "Cash summary" and "Unpaid list", for headset browsers without speech recognition.
 - **Guided tutorial:** a five-step "Get started" panel ticks off as you grab, throw, approve, talk and chase.
 - **Cash forecast wall:** bars for money that is late, due this week, next week and later.
 - **Instant demo:** if the connected account has no invoices, the room loads clearly labelled sample data, and switches to live data as soon as the agent creates a real invoice.
@@ -36,3 +37,10 @@ Hold your unpaid invoices in your hands: a mixed-reality cash-flow room where yo
 - In the main web app, the header has a **🥽 Tallyspace VR** button.
 - Open https://duepilot-4f2q.onrender.com/vr/ in the Meta Quest Browser, then press **Enter MR** or **Enter VR**.
 - On a laptop, drag invoices into the bins with the mouse. Press **Sample data** for an offline demo.
+
+## Demo video
+A 63-second captioned screen recording (no sound) is on the Desktop as `Tallyspace-demo.mp4`. It shows the desktop mouse fallback with sample data, not headset footage. Upload it to YouTube and paste the link into the Devpost form. If the rules ask for in-headset footage, record that on the Quest instead.
+
+## Not yet verified
+- Nothing has been tried on a physical Quest headset: VR and MR entry, controller and hand grabbing, haptics and the mic orb are untested there.
+- Sounds were not checked.

@@ -47,6 +47,15 @@ Verified on the real PayPal sandbox: with a $200 limit, a $15 invoice was create
 - **Audit log**, **voice input**, responsive down to phone width, light and dark themes.
 - **Load sample data** (demo mode only) fills in a realistic client history so insights have something to show.
 
+## 🥽 Tallyspace: the same ledger in VR and mixed reality
+Open `/vr/` (live: https://duepilot-4f2q.onrender.com/vr/) in the Meta Quest Browser, or on a laptop or phone.
+- Each invoice is a block you can pick up. Height is the amount; red is overdue, amber is waiting, green is paid.
+- Throw an invoice into **Remind**, **Cancel** or **Sync PayPal**. Remind and Cancel only create a proposal; you run it by dropping its tablet on **APPROVE**, so the approval rule is the same as in the web app.
+- An in-room console has Chase overdue, Briefing, Match payments and quick questions; a mic orb talks to the Gemini agent where the browser supports speech recognition.
+- Also in the room: PayPal scan-to-pay QR for a held invoice, client risk orbs, cash-flow totals, a 4-week forecast, the audit log, a combo meter and a five-step tutorial.
+- Uses three.js WebXR (`immersive-vr` and `immersive-ar`), controllers or hand tracking, with a mouse/touch fallback. An empty account opens in clearly labelled sample data.
+- Not yet tested on a physical headset. `node scripts/record-vr.js` records a captioned demo of the desktop fallback.
+
 ## Why it's different
 - **Agentic, but safe.** The model can only *propose* actions through typed tools. Every write to PayPal goes through a human approval card. Caps on invoice and payout amounts are enforced in code (not in the prompt), and every proposal, approval, API call and webhook lands in the audit log.
 - **Closes the loop.** Most "AI invoice" demos stop at generating a PDF. DuePilot sends through PayPal, collects, reconciles from webhooks and follows up.

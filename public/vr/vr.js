@@ -548,16 +548,34 @@ $('#sample').onclick = () => setSample(!sample);
 // ---------- in-room control console (the HTML bar is invisible inside a headset) ----------
 const clickables = [];
 const consoleRow = new THREE.Group(); consoleRow.position.set(0.22, 0.7, -0.7); consoleRow.rotation.x = -0.6; scene.add(consoleRow);
-function button3d(label, color, x, fn) {
+function button3d(label, color, x, fn, parent = consoleRow, y = 0) {
   const b = panel(0.31, 0.1, 512);
   b.userData.fn = fn;
   b.userData.paint = (text) => b.draw((g, W, H) => { card(g, W, H, color); g.fillStyle = '#fff'; g.font = 'bold 46px system-ui'; g.textAlign = 'center'; g.fillText(text, W / 2, H * 0.64); });
-  b.userData.paint(label); b.position.x = x; consoleRow.add(b); clickables.push(b); return b;
+  b.userData.paint(label); b.position.set(x, y, 0); parent.add(b); clickables.push(b); return b;
 }
 button3d('⚡ Chase overdue', '#5c2a12f2', -0.495, () => $('#chase').click());
 button3d('📣 Briefing', '#16306af2', -0.165, () => $('#brief').click());
 button3d('🔍 Match payments', '#16306af2', 0.165, () => $('#match').click());
 const sampleBtn3d = button3d('Sample data', '#2a2f4af2', 0.495, () => $('#sample').click());
+// Quick questions: one-press prompts for the agent (speech recognition is not available in every headset browser).
+const askCol = new THREE.Group(); askCol.position.set(1.08, 0.82, -0.5); askCol.rotation.y = -0.6; scene.add(askCol);
+button3d('❓ Who to chase?', '#3b1f5cf2', 0, () => ask('chase', 'Who should I chase first?'), askCol, 0.12);
+button3d('💰 Cash summary', '#3b1f5cf2', 0, () => ask('summary', 'Give me a cash flow summary'), askCol, 0);
+button3d('🧾 Unpaid list', '#3b1f5cf2', 0, () => ask('unpaid', 'Show unpaid invoices'), askCol, -0.12);
+function ask(kind, prompt) {
+  if (!sample) return chat(prompt).catch((e) => log(`⚠️ ${e.message}`));
+  // Sample room: answer from the sample numbers on screen, so the reply matches what you see.
+  quest('chat'); log(`🗣 ${prompt}`);
+  const open = state.invoices.filter((i) => ['SENT', 'OVERDUE'].includes(i.status));
+  const sm = state.summary; let text;
+  if (kind === 'chase') {
+    const c = [...state.insights].filter((x) => x.owed > 0).sort((a, b) => (b.overdue - a.overdue) || (b.owed - a.owed))[0];
+    text = c ? `Chase ${c.client} first: ${fmt(c.owed)} owed${c.overdue ? `, ${c.overdue} invoice${c.overdue > 1 ? 's' : ''} overdue` : ''}.` : 'Nobody owes you anything right now.';
+  } else if (kind === 'summary') text = `${fmt(sm.paid)} paid, ${fmt(sm.outstanding)} outstanding, of which ${fmt(sm.overdue)} is overdue.`;
+  else text = open.length ? `${open.length} unpaid: ${open.slice(0, 4).map((i) => `#${i.number} ${i.clientName} ${fmt(i.amount)}`).join('; ')}${open.length > 4 ? '; and more' : ''}.` : 'No unpaid invoices.';
+  text += ' (sample data)'; log(text); speak(text);
+}
 function syncSampleLabel() { sampleBtn3d.userData.paint(sample ? 'Live data' : 'Sample data'); }
 function pressButton(b) {
   b.scale.setScalar(0.88); setTimeout(() => b.scale.setScalar(1), 140); blip(); buzz(0.5, 30);
