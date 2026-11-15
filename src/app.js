@@ -17,6 +17,8 @@ function createApp(config, { store = createStore(config.dataFile), paypal, provi
   let publicOrigin = config.publicUrl || null;
   app.use((req, res, next) => { if (!config.publicUrl && req.get('host')) publicOrigin = `${req.protocol}://${req.get('host')}`; next(); });
   app.use(express.json({ limit: '200kb' }));
+  // The Tallyspace site (its own Render service, or any host named tallyspace*) opens straight into the VR room.
+  app.get('/', (req, res, next) => (process.env.HOME_PAGE === 'vr' || /^tallyspace/i.test(req.hostname || '') ? res.redirect(302, '/vr/') : next()));
   app.use(express.static(path.join(__dirname, '..', 'public')));
   let chatHistory = [];
 
