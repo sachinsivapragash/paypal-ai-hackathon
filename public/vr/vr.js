@@ -1,5 +1,5 @@
-// DuePilot Ledger Room: a WebXR (VR + passthrough MR) view of your receivables, wired to the live
-// DuePilot backend (PayPal sandbox + Gemini agent). Every write still goes through DuePilot's
+// Tallyspace: a WebXR (VR + passthrough MR) view of your receivables, wired to the live
+// Tallyspace backend (PayPal sandbox + Gemini agent). Every write still goes through the backend's
 // approval endpoint: throwing an invoice in a bin only *proposes* an action; you approve it by
 // dropping its tablet in the green slot.
 import * as THREE from 'three';
@@ -33,9 +33,9 @@ const scene = new THREE.Scene();
 const roomBg = new THREE.Color(0x0b1020);
 scene.background = roomBg;
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 100);
-camera.position.set(0, 2.1, 3.4);
+camera.position.set(0, 2.0, 2.3);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.1, -0.6);
+controls.target.set(0, 1.2, -0.8);
 controls.update();
 
 scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x202040, 1.1));
@@ -79,31 +79,31 @@ function card(g, W, H, fill = '#0f1630ee') {
 
 // Agent panel (big screen behind the shelf)
 const agentPanel = panel(1.6, 0.7, 1024);
-agentPanel.position.set(0, 2.2, -2.2);
+agentPanel.position.set(0, 1.85, -2.0);
 scene.add(agentPanel);
 agentPanel.set = (msg) => agentPanel.draw((g, W, H) => {
   card(g, W, H);
-  g.fillStyle = '#8fb0ff'; g.font = 'bold 34px system-ui'; g.fillText('DuePilot agent (Gemini)', 30, 56);
+  g.fillStyle = '#8fb0ff'; g.font = 'bold 34px system-ui'; g.fillText('Tallyspace agent (Gemini)', 30, 56);
   g.fillStyle = '#e8ecf6'; g.font = '30px system-ui'; wrapText(g, msg, 30, 110, W - 60, 38, 9);
 });
 agentPanel.set('Say or type a request. Throw an invoice into a bin to propose an action.');
 
 // Audit ticker
 const auditPanel = panel(0.9, 0.9, 512);
-auditPanel.position.set(-2.1, 1.5, -1.2);
-auditPanel.rotation.y = Math.PI / 4;
+auditPanel.position.set(-1.55, 1.55, -1.05);
+auditPanel.rotation.y = Math.PI / 3.5;
 scene.add(auditPanel);
 
 // Cash-flow summary
 const sumPanel = panel(1.0, 0.45, 512);
-sumPanel.position.set(0, 2.85, -2.2);
+sumPanel.position.set(0, 2.45, -2.0);
 scene.add(sumPanel);
 
 // QR / detail panel (shows the invoice you are holding)
 const detailPanel = panel(0.6, 0.75, 512);
-detailPanel.position.set(1.15, 1.45, -0.9);
-detailPanel.rotation.y = -Math.PI / 6;
-scene.add(detailPanel);
+detailPanel.position.set(0.8, 1.4, -0.55);
+detailPanel.rotation.y = -Math.PI / 4.5;
+scene.add(detailPanel); detailPanel.visible = false;
 detailPanel.draw((g, W, H) => { card(g, W, H); g.fillStyle = '#aab4d4'; g.font = '28px system-ui'; wrapText(g, 'Grab an invoice to see details and its PayPal scan-to-pay QR code.', 24, 60, W - 48, 36); });
 
 // ---------- drop targets ----------
@@ -115,23 +115,24 @@ function addTarget(kind, accepts, label, color, pos, radius = 0.22) {
   const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.25, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }));
   m.position.y = isBin ? 0.225 : 0.02;
   g.add(m);
-  const lab = panel(0.5, 0.12, 512);
+  const lab = panel(isBin ? 0.5 : 0.3, isBin ? 0.12 : 0.072, 512);
   lab.draw((c, W, H) => { c.fillStyle = '#' + color.toString(16).padStart(6, '0'); c.font = 'bold 64px system-ui'; c.textAlign = 'center'; c.fillText(label, W / 2, H * 0.72); });
-  lab.position.y = isBin ? 0.6 : 0.2;
+  lab.position.y = isBin ? 0.6 : 0.09;
   g.add(lab);
   g.position.copy(pos);
   scene.add(g);
   targets.push({ kind, accepts, group: g, radius, top: isBin ? 0.45 : 0.06, mesh: m, label: lab });
 }
-addTarget('remind', 'invoice', 'Remind', COLORS.SENT, new THREE.Vector3(-0.7, 0, 0.1));
-addTarget('sync', 'invoice', 'Sync PayPal', COLORS.PAID, new THREE.Vector3(0, 0, 0.35));
-addTarget('cancel', 'invoice', 'Cancel', COLORS.OVERDUE, new THREE.Vector3(0.7, 0, 0.1));
+addTarget('remind', 'invoice', 'Remind', COLORS.SENT, new THREE.Vector3(-0.5, 0, -0.55), 0.17);
+addTarget('sync', 'invoice', 'Sync PayPal', COLORS.PAID, new THREE.Vector3(0, 0, -0.45), 0.17);
+addTarget('cancel', 'invoice', 'Cancel', COLORS.OVERDUE, new THREE.Vector3(0.5, 0, -0.55), 0.17);
 // approval table on the left
 const table = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.04, 0.6), new THREE.MeshStandardMaterial({ color: 0x223066 }));
-table.position.set(-1.3, 0.8, -0.3); table.rotation.y = Math.PI / 5;
-scene.add(table);
-addTarget('approve', 'pending', 'APPROVE', COLORS.PAID, new THREE.Vector3(-1.05, 0.82, 0.05), 0.16);
-addTarget('reject', 'pending', 'Reject', COLORS.OVERDUE, new THREE.Vector3(-1.55, 0.82, -0.25), 0.13);
+table.position.set(-0.85, 0.78, -0.35); table.rotation.y = Math.PI / 5;
+scene.add(table); table.updateMatrixWorld();
+const onTable = (x, z) => table.localToWorld(new THREE.Vector3(x, 0.02, z));
+addTarget('approve', 'pending', 'APPROVE', COLORS.PAID, onTable(0.3, 0.17), 0.11);
+addTarget('reject', 'pending', 'Reject', COLORS.OVERDUE, onTable(0.3, -0.19), 0.09);
 for (const t of targets) if (t.accepts === 'pending') t.group.rotation.y = Math.PI / 5;
 
 // ---------- data ----------
@@ -184,9 +185,9 @@ const fmt = (n, c = 'USD') => `${c === 'USD' ? '$' : ''}${Math.round(n).toLocale
 
 function render() {
   const s = state;
-  $('#src').textContent = sample ? 'Sample data (local, nothing is sent to PayPal)' : `Live: DuePilot · PayPal ${status.paypal || '?'} · AI ${status.ai || '?'}`;
+  $('#src').textContent = sample ? 'Sample data (local, nothing is sent to PayPal)' : `Live · PayPal ${status.paypal || '?'} · AI ${status.ai || '?'}`;
   // chime + log when an invoice becomes PAID (webhook reconciled)
-  for (const i of s.invoices) { const was = prevStatus.get(i.id); if (was && was !== 'PAID' && i.status === 'PAID') { chime(); log(`💰 Invoice #${i.number} from ${i.clientName} was paid`); } prevStatus.set(i.id, i.status); }
+  for (const i of s.invoices) { const was = prevStatus.get(i.id); if (was && was !== 'PAID' && i.status === 'PAID') { chime(); const m = grabbables.get(i.id); coinBurst(m ? m.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 1.2, -1)); log(`💰 Invoice #${i.number} from ${i.clientName} was paid`); } prevStatus.set(i.id, i.status); }
   drawSummary(s); drawAudit(s);
   const sig = JSON.stringify([s.invoices.map((i) => [i.id, i.status, i.amount]), s.pending.map((p) => p.id), s.insights?.map((c) => [c.client, c.owed, c.risk])]);
   if (sig === lastSig) return; lastSig = sig;
@@ -221,14 +222,14 @@ function render() {
   }
 
   // Approval tablets on the table
-  s.pending.slice(0, 6).forEach((p, k) => {
+  s.pending.slice(0, 4).forEach((p, k) => {
     const t = panel(0.24, 0.16, 384);
     t.material.side = THREE.DoubleSide;
     const d = p.data || {};
     t.draw((g, W, H) => { card(g, W, H, '#132046f2'); g.fillStyle = '#8fb0ff'; g.font = 'bold 26px system-ui'; g.fillText(p.type.replace(/_/g, ' '), 16, 40); g.fillStyle = '#fff'; g.font = '24px system-ui'; wrapText(g, [d.clientName || d.receiver || d.client || d.number && `#${d.number}`, d.amount && fmt(d.amount, d.currency), d.description || d.message].filter(Boolean).join(' · '), 16, 78, W - 32, 30, 4); });
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.17, 0.012), new THREE.MeshStandardMaterial({ color: 0x5b8cff }));
     t.position.z = 0.007; body.add(t);
-    body.position.set(-1.45 + (k % 3) * 0.27, 0.92 + Math.floor(k / 3) * 0.2, -0.55 + (k % 3) * 0.17);
+    body.position.copy(onTable(-0.3 + (k % 2) * 0.27, -0.12 + Math.floor(k / 2) * 0.15)).add(new THREE.Vector3(0, 0.1, 0));
     body.rotation.set(-0.5, Math.PI / 5, 0);
     body.userData = { id: p.id, kind: 'pending', p, home: body.position.clone(), homeQ: body.quaternion.clone(), h: 0.17 };
     pendingGroup.add(body); grabbables.set(p.id, body);
@@ -240,7 +241,7 @@ function render() {
     const orb = new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), new THREE.MeshStandardMaterial({ color: RISK[c.risk] || 0x8892b0, emissive: RISK[c.risk] || 0, emissiveIntensity: 0.35, roughness: 0.2 }));
     const lab = panel(0.36, 0.08, 256); lab.draw((g, W, H) => { g.fillStyle = '#e8ecf6'; g.font = '26px system-ui'; g.textAlign = 'center'; g.fillText(`${c.client.slice(0, 16)} ${fmt(c.owed)}`, W / 2, 40); });
     lab.position.y = r + 0.06; orb.add(lab);
-    orb.position.set(1.9 + (k % 2) * 0.45, 0.9 + Math.floor(k / 2) * 0.4, -0.6 + (k % 2) * 0.3);
+    orb.position.set(1.45 + (k % 2) * 0.3, 0.9 + Math.floor(k / 2) * 0.3, -1.45 + (k % 2) * 0.3);
     orb.userData = { id: 'orb' + k, kind: 'orb', bob: k };
     orbGroup.add(orb);
   });
@@ -268,7 +269,7 @@ async function act(target, obj) {
   buzz(0.8, 60);
   try {
     if (sample) return sampleAct(target.kind, u);
-    if (target.kind === 'approve') { log(`Approving ${u.p.type.replace(/_/g, ' ')}… (PayPal sandbox)`); const r = await api(`/api/actions/${u.id}/approve`, {}); state = r.state; chime(); log(`✅ Done${r.result?.number ? `: invoice #${r.result.number}` : ''}${r.result?.payLink ? ' · pay link ready' : ''}`); }
+    if (target.kind === 'approve') { log(`Approving ${u.p.type.replace(/_/g, ' ')}… (PayPal sandbox)`); const r = await api(`/api/actions/${u.id}/approve`, {}); state = r.state; chime(); coinBurst(target.group.position.clone().add(new THREE.Vector3(0, 0.1, 0))); log(`✅ Done${r.result?.number ? `: invoice #${r.result.number}` : ''}${r.result?.payLink ? ' · pay link ready' : ''}`); }
     else if (target.kind === 'reject') { const r = await api(`/api/actions/${u.id}/reject`, {}); state = r.state || state; log('Rejected. Nothing was sent to PayPal.'); }
     else if (target.kind === 'sync') { log(`Syncing #${u.inv.number} with PayPal…`); const r = await api(`/api/invoices/${u.id}/sync`, {}); state = r.state || state; const now = r.state?.invoices?.find((i) => i.id === u.id); log(`#${u.inv.number} is ${now?.status || 'up to date'} on PayPal`); }
     else if (target.kind === 'remind') await chat(`Send a reminder for invoice #${u.inv.number}`);
@@ -286,7 +287,7 @@ function sampleAct(kind, u) {
     if (kind === 'approve') {
       const inv = state.invoices.find((i) => i.id === u.p.data.invoiceId);
       if (inv && u.p.type === 'cancel_invoice') inv.status = 'CANCELLED';
-      log(`✅ Approved ${u.p.type.replace(/_/g, ' ')} (sample, nothing sent)`); chime();
+      log(`✅ Approved ${u.p.type.replace(/_/g, ' ')} (sample, nothing sent)`); chime(); coinBurst(targets.find((t) => t.kind === 'approve').group.position.clone().add(new THREE.Vector3(0, 0.1, 0)));
     } else log('Rejected.');
     state.audit.unshift({ at: new Date().toISOString(), actor: 'user', action: `${kind}_${u.p.type}` });
   }
@@ -295,7 +296,7 @@ function sampleAct(kind, u) {
 }
 async function chat(message) {
   log(`🗣 ${message}`);
-  if (sample) { log('Sample mode: connect the live DuePilot backend to talk to Gemini.'); return; }
+  if (sample) { log('Sample mode: switch to Live data to talk to Gemini.'); return; }
   const r = await api('/api/chat', { message });
   state = r.state; speak(r.reply); log(r.reply);
   if (r.proposals?.length) log(`${r.proposals.length} approval tablet(s) are on the table. Drop one in APPROVE to send it to PayPal.`);
@@ -304,7 +305,10 @@ async function chat(message) {
 
 // ---------- detail / QR for a held invoice ----------
 async function showDetail(u) {
-  if (u.kind === 'pending') return detailPanel.draw((g, W, H) => { card(g, W, H); g.fillStyle = '#8fb0ff'; g.font = 'bold 30px system-ui'; g.fillText('Approval needed', 24, 50); g.fillStyle = '#fff'; g.font = '24px system-ui'; wrapText(g, JSON.stringify(u.p.data).replace(/[{}"]/g, ' ').slice(0, 400), 24, 96, W - 48, 30, 16); });
+  detailPanel.visible = true;
+  if (u.kind === 'pending') return detailPanel.draw((g, W, H) => { card(g, W, H); g.fillStyle = '#8fb0ff'; g.font = 'bold 30px system-ui'; g.fillText('Approval needed', 24, 50); g.fillStyle = '#fff'; g.font = '24px system-ui'; const d = u.p.data || {}; const rows = [['Action', u.p.type.replace(/_/g, ' ')], ['Client', d.clientName || d.client || d.receiver], ['Invoice', d.number && '#' + d.number], ['Amount', d.amount && fmt(d.amount, d.currency)], ['For', d.description], ['Message', d.message]].filter((r) => r[1]);
+    rows.forEach(([k, v], n) => { g.fillStyle = '#7d8bbd'; g.fillText(k, 24, 100 + n * 44); g.fillStyle = '#fff'; g.fillText(String(v).slice(0, 26), 150, 100 + n * 44); });
+    g.fillStyle = '#4cd98a'; g.font = '22px system-ui'; wrapText(g, 'Drop in APPROVE to run it on PayPal, or in Reject to discard.', 24, H - 70, W - 48, 28, 2); });
   const i = u.inv;
   let img = null;
   if (!sample && ['SENT', 'OVERDUE'].includes(i.status)) {
@@ -459,7 +463,7 @@ function speak(text) {
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false;
 const micOrb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 24, 16), new THREE.MeshStandardMaterial({ color: 0x5b8cff, emissive: 0x2244aa, emissiveIntensity: 0.6 }));
-micOrb.position.set(0.55, 1.15, -0.25);
+micOrb.position.set(0.42, 1.05, -0.5);
 scene.add(micOrb);
 const micLab = panel(0.3, 0.07, 256); micLab.draw((g, W) => { g.fillStyle = '#cfd6ee'; g.font = '28px system-ui'; g.textAlign = 'center'; g.fillText('🎙 talk to agent', W / 2, 40); });
 micLab.position.y = 0.11; micOrb.add(micLab);
@@ -491,7 +495,7 @@ $('#sample').onclick = () => { sample = !sample; $('#sample').textContent = samp
 // ---------- XR entry buttons (VR and passthrough MR) ----------
 const vrBtn = VRButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] });
 const arBtn = ARButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] });
-vrBtn.style.bottom = arBtn.style.bottom = '80px';
+for (const b of [vrBtn, arBtn]) { b.style.bottom = 'auto'; b.style.top = '12px'; }
 vrBtn.style.left = 'calc(50% - 150px)'; arBtn.style.left = 'calc(50% + 10px)';
 vrBtn.style.width = arBtn.style.width = '140px';
 document.body.append(vrBtn, arBtn);
@@ -504,13 +508,56 @@ renderer.xr.addEventListener('sessionend', () => { room.visible = true; scene.ba
 
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
+// ---------- coin burst (money arrived / approved) ----------
+const coinGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.006, 16);
+const coinMat = new THREE.MeshStandardMaterial({ color: 0xffd34d, metalness: 0.8, roughness: 0.25, emissive: 0x553300, transparent: true });
+const coins = [];
+function coinBurst(at, n = 18) {
+  for (let i = 0; i < n; i++) {
+    const c = new THREE.Mesh(coinGeo, coinMat.clone());
+    c.position.copy(at);
+    c.userData.v = new THREE.Vector3((Math.random() - 0.5) * 1.4, 1.6 + Math.random() * 1.4, (Math.random() - 0.5) * 1.4);
+    c.userData.spin = new THREE.Vector3(Math.random() * 10, Math.random() * 10, 0);
+    c.userData.life = 1.4; scene.add(c); coins.push(c);
+  }
+}
+function stepCoins(dt) {
+  for (let k = coins.length - 1; k >= 0; k--) {
+    const c = coins[k]; const u = c.userData; u.life -= dt; u.v.y -= 6 * dt;
+    c.position.addScaledVector(u.v, dt); c.rotation.x += u.spin.x * dt; c.rotation.y += u.spin.y * dt;
+    c.material.opacity = Math.min(1, u.life * 2);
+    if (u.life <= 0) { scene.remove(c); c.material.dispose(); coins.splice(k, 1); }
+  }
+}
+
+// ---------- hover highlight (mouse + controller rays) ----------
+let hoverMouse = null;
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (mouse.obj) return;
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  hoverMouse = hitTest(raycaster.ray.origin, raycaster.ray.direction);
+  renderer.domElement.style.cursor = hoverMouse ? 'grab' : '';
+});
+function hoveredSet() {
+  const s = new Set(); if (hoverMouse) s.add(hoverMouse);
+  if (renderer.xr.isPresenting) for (const x of xrInputs) if (!x.obj) {
+    tmpM.identity().extractRotation(x.c.matrixWorld);
+    const o = hitTest(new THREE.Vector3().setFromMatrixPosition(x.c.matrixWorld), new THREE.Vector3(0, 0, -1).applyMatrix4(tmpM));
+    if (o) { s.add(o); if (x.lastHover !== o) { x.gamepad?.hapticActuators?.[0]?.pulse?.(0.15, 15); x.lastHover = o; } } else x.lastHover = null;
+  }
+  return s;
+}
+
 // ---------- loop ----------
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(0.05, clock.getDelta()); const t = clock.elapsedTime;
   for (const s of xrInputs) if (s.obj) { s.hist.push({ p: s.obj.getWorldPosition(new THREE.Vector3()), t }); if (s.hist.length > 6) s.hist.shift(); }
   if (mouse.obj) { mouse.hist.push({ p: mouse.holder.position.clone(), t }); if (mouse.hist.length > 6) mouse.hist.shift(); }
-  stepFlying(dt);
+  stepFlying(dt); stepCoins(dt);
+  const hov = hoveredSet();
+  for (const m of grabbables.values()) { const target = hov.has(m) || held.has(m) ? 1.12 : 1; m.scale.lerp(new THREE.Vector3(target, target, target), 0.25); }
   for (let k = pulses.length - 1; k >= 0; k--) { const p = pulses[k]; p.life -= dt; p.t.mesh.material.emissiveIntensity = 0.25 + 2 * Math.max(0, p.life); if (p.life <= 0) pulses.splice(k, 1); }
   for (const m of invoiceGroup.children) if (m.userData.inv?.status === 'OVERDUE' && !held.has(m)) m.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(t * 4);
   for (const o of orbGroup.children) o.position.y += Math.sin(t * 1.5 + o.userData.bob) * 0.0008;

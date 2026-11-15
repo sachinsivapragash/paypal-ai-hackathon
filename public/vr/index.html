@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DuePilot Ledger Room · VR / MR</title>
+<title>Tallyspace · VR / MR cash flow</title>
 <style>
   :root{--bg:#0b1020;--panel:#0f1630e6;--line:#2a3558;--muted:#aab4d4;--txt:#e8ecf6;--acc:#5b8cff}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:14px system-ui,sans-serif;overflow:hidden}
@@ -18,7 +18,8 @@
   button{background:#1b2650;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;font:inherit}
   button:hover{border-color:var(--acc)}
   button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
-  #log{right:12px;top:12px;width:300px;max-height:45vh;overflow:auto;font-size:12px}
+  #log{right:12px;top:64px;width:300px;max-height:45vh;overflow:auto;font-size:12px}
+  #log:empty{display:none}
   #log div{padding:3px 0;border-bottom:1px solid #1b2340}
   @media (max-width:700px){#log{display:none}#hud{width:calc(100% - 48px)}}
 </style>
@@ -28,10 +29,10 @@
 </head>
 <body>
 <div id="hud" class="box">
-  <h1>DuePilot Ledger Room</h1>
-  <p>Your receivables as physical objects. Height = amount · colour = status (amber sent, red overdue, green paid).</p>
+  <h1>Tallyspace <button id="hudToggle" title="Hide help" style="float:right;padding:2px 8px">–</button></h1>
+  <div id="hudBody"><p>Your receivables as physical objects. Height = amount · colour = status (amber sent, red overdue, green paid).</p>
   <p><b>VR/MR:</b> trigger or pinch to grab an invoice and throw it into a bin. Grab an approval tablet and drop it in the green slot to approve on PayPal.<br><b>Desktop:</b> drag with the mouse, right-drag to orbit.</p>
-  <div id="src">Connecting…</div>
+  </div><div id="src">Connecting…</div>
 </div>
 <div id="log" class="box"></div>
 <div id="bar" class="box">
@@ -42,6 +43,11 @@
   <button id="match">🔍 Match payments</button>
   <button id="sample">Sample data</button>
 </div>
+<script>
+  (() => { const b = document.getElementById('hudToggle'), body = document.getElementById('hudBody');
+    const set = (open) => { body.style.display = open ? '' : 'none'; b.textContent = open ? '–' : '?'; b.title = open ? 'Hide help' : 'Show help'; };
+    b.onclick = () => set(body.style.display === 'none'); setTimeout(() => set(false), 12000); })();
+</script>
 <script type="module" src="vr.js"></script>
 </body>
 </html>
