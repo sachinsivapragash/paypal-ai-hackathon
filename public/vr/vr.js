@@ -37,9 +37,10 @@ const scene = new THREE.Scene();
 const roomBg = new THREE.Color(0x0b1020);
 scene.background = roomBg;
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 100);
-camera.position.set(0, 2.0, 2.3);
+const wide = innerWidth / innerHeight > 1.4; // landscape screens: stand closer so the room fills the frame
+camera.position.set(0, wide ? 1.9 : 2.0, wide ? 1.9 : 2.3);
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.2, -0.8);
+controls.target.set(0, wide ? 1.1 : 1.2, wide ? -0.85 : -0.8);
 controls.update();
 
 scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x202040, 1.1));
@@ -207,6 +208,9 @@ function render() {
   if (sig === lastSig) return; lastSig = sig;
 
   for (const g of [invoiceGroup, pendingGroup, orbGroup]) for (const m of [...g.children]) if (!held.has(m)) { g.remove(m); grabbables.delete(m.userData.id); }
+  // thrown objects are re-parented to the scene, so clear those too (otherwise a miss leaves a ghost copy)
+  for (const [id, m] of [...grabbables]) if (!held.has(m)) { m.removeFromParent(); grabbables.delete(id); }
+  for (const arr of [flying, homing]) for (let k = arr.length - 1; k >= 0; k--) if (!(arr[k].obj || arr[k].o).parent) arr.splice(k, 1);
 
   // Invoices on a timeline arc: most overdue on the left, due-latest on the right.
   const open = s.invoices.filter((i) => ['SENT', 'OVERDUE', 'PAID'].includes(i.status)).sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')).slice(0, 18);
@@ -288,7 +292,8 @@ function drawAudit(s) {
 // ---------- actions (bins / slots) ----------
 async function act(target, obj) {
   const u = obj.userData;
-  bumpCombo(u); quest(target.kind);
+  bumpCombo(u); quest(target.kind); hideDetailSoon();
+  obj.removeFromParent(); if (grabbables.get(u.id) === obj) grabbables.delete(u.id);
   buzz(0.8, 60);
   try {
     if (sample) return sampleAct(target.kind, u);
@@ -373,7 +378,10 @@ function grab(obj, holder) {
   showDetail(obj.userData); buzz(0.4, 30);
   if (obj.userData.kind === 'invoice') quest('grab');
 }
+let detailTimer;
+function hideDetailSoon() { clearTimeout(detailTimer); detailTimer = setTimeout(() => { if (!held.size) detailPanel.visible = false; }, 3500); }
 function release(obj, velocity) {
+  hideDetailSoon();
   if (velocity.length() > 1.2) whoosh(Math.min(1, velocity.length() / 5));
   held.delete(obj); scene.attach(obj);
   flying.push({ obj, vel: velocity.clone(), t: 0 });
@@ -446,7 +454,15 @@ addEventListener('pointerup', (e) => {
   // Desktop: releasing the pointer over a bin/slot drops the object into it.
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera); raycaster.far = 20;
-  const tgt = targets.find((t) => t.accepts === mouse.obj.userData.kind && raycaster.intersectObjects([t.mesh, t.label]).length);
+  let tgt = targets.find((t) => t.accepts === mouse.obj.userData.kind && raycaster.intersectObjects([t.mesh, t.label]).length);
+  if (!tgt) { // forgiving drop: releasing within ~70px of a matching bin or pad counts
+    let best = 70;
+    for (const t of targets) if (t.accepts === mouse.obj.userData.kind) {
+      const v = t.mesh.getWorldPosition(new THREE.Vector3()).project(camera);
+      const d = Math.hypot((v.x + 1) / 2 * innerWidth - e.clientX, (1 - v.y) / 2 * innerHeight - e.clientY);
+      if (d < best) { best = d; tgt = t; }
+    }
+  }
   if (tgt) { const o = mouse.obj; held.delete(o); scene.attach(o); o.visible = false; mouse.obj = null; controls.enabled = true; pulseTarget(tgt); impact(tgt); act(tgt, o); return; }
   release(mouse.obj, velocityOf(mouse.hist).multiplyScalar(0.6)); mouse.obj = null; controls.enabled = true;
 });
@@ -780,6 +796,16 @@ renderer.setAnimationLoop(() => {
     shake.amt *= 0.86;
   }
 });
+
+// Dev hook used by scripts/record-vr.js: where an object is on screen.
+window.tallyspace = { locate(key) {
+  const all = [...grabbables.values()];
+  const o = key === 'overdue' ? all.find((m) => m.userData.inv?.status === 'OVERDUE') : key === 'sent' ? all.find((m) => m.userData.inv?.status === 'SENT')
+    : key === 'tablet' ? all.find((m) => m.userData.kind === 'pending') : key.startsWith('bin:') ? targets.find((t) => t.kind === key.slice(4))?.mesh : clickables[+key.slice(4)];
+  if (!o) return null;
+  const v = o.getWorldPosition(new THREE.Vector3()).project(camera);
+  return { x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight };
+} };
 
 // ---------- boot ----------
 (async () => {

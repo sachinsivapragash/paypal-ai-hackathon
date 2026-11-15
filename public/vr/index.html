@@ -7,7 +7,8 @@
 <style>
   :root{--bg:#0b1020;--panel:#0f1630e6;--line:#2a3558;--muted:#aab4d4;--txt:#e8ecf6;--acc:#5b8cff}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:14px system-ui,sans-serif;overflow:hidden}
-  canvas{display:block}
+  canvas{display:block;touch-action:none}
+  #hud,#log{user-select:none}
   .box{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;z-index:5}
   #hud{left:12px;top:12px;width:330px}
   #hud h1{font-size:16px;margin:0 0 4px}
