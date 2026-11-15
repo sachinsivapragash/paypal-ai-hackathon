@@ -103,8 +103,8 @@ agentPanel.set('Say or type a request. Throw an invoice into a bin to propose an
 
 // Audit ticker
 const auditPanel = panel(0.9, 0.9, 512);
-auditPanel.position.set(-1.55, 1.55, -1.05);
-auditPanel.rotation.y = Math.PI / 3.5;
+auditPanel.position.set(1.8, 1.6, -0.7);
+auditPanel.rotation.y = -Math.PI / 2.8;
 scene.add(auditPanel);
 
 // Cash-flow summary
@@ -149,7 +149,7 @@ addTarget('reject', 'pending', 'Reject', COLORS.OVERDUE, onTable(0.3, -0.19), 0.
 for (const t of targets) if (t.accepts === 'pending') t.group.rotation.y = Math.PI / 5;
 
 // ---------- data ----------
-let state = null; let sample = false; let status = {};
+let state = null; let sample = false; let status = {}; let backendOk = false; let sampleWhy = '';
 const grabbables = new Map(); // id -> mesh
 let lastSig = '';
 let roseOnce = false;
@@ -187,8 +187,8 @@ function summaryOf(inv) {
 
 async function refresh() {
   if (sample) return render();
-  try { state = await api('/api/state'); render(); }
-  catch (e) { $('#src').textContent = `Backend unreachable (${e.message}). Showing sample data.`; sample = true; state = sampleState(); render(); }
+  try { state = await api('/api/state'); backendOk = true; render(); }
+  catch (e) { backendOk = false; setSample(true, 'backend unreachable'); }
 }
 
 // ---------- building the room from state ----------
@@ -199,10 +199,10 @@ const fmt = (n, c = 'USD') => `${c === 'USD' ? '$' : ''}${Math.round(n).toLocale
 
 function render() {
   const s = state;
-  $('#src').textContent = sample ? 'Sample data (local, nothing is sent to PayPal)' : `Live · PayPal ${status.paypal || '?'} · AI ${status.ai || '?'}`;
+  $('#src').textContent = sample ? `Sample data${sampleWhy ? ' · ' + sampleWhy : ''} (nothing is sent to PayPal)` : `Live · PayPal ${status.paypal || '?'} · AI ${status.ai || '?'}`;
   // chime + log when an invoice becomes PAID (webhook reconciled)
   for (const i of s.invoices) { const was = prevStatus.get(i.id); if (was && was !== 'PAID' && i.status === 'PAID') { chime(); const m = grabbables.get(i.id); coinBurst(m ? m.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 1.2, -1)); log(`💰 Invoice #${i.number} from ${i.clientName} was paid`); } prevStatus.set(i.id, i.status); }
-  drawSummary(s); drawAudit(s);
+  drawSummary(s); drawAudit(s); drawForecast(s);
   const sig = JSON.stringify([s.invoices.map((i) => [i.id, i.status, i.amount]), s.pending.map((p) => p.id), s.insights?.map((c) => [c.client, c.owed, c.risk])]);
   if (sig === lastSig) return; lastSig = sig;
 
@@ -288,7 +288,7 @@ function drawAudit(s) {
 // ---------- actions (bins / slots) ----------
 async function act(target, obj) {
   const u = obj.userData;
-  bumpCombo(u);
+  bumpCombo(u); quest(target.kind);
   buzz(0.8, 60);
   try {
     if (sample) return sampleAct(target.kind, u);
@@ -302,6 +302,8 @@ async function act(target, obj) {
 }
 function sampleAct(kind, u) {
   if (kind === 'remind' || kind === 'cancel') {
+    const type = kind === 'remind' ? 'send_reminder' : 'cancel_invoice';
+    if (state.pending.some((p) => p.type === type && p.data.invoiceId === u.id)) { log(`#${u.inv.number} already has that proposal waiting on the table.`); lastSig = ''; return render(); }
     state.pending.unshift({ id: 'sp' + Date.now(), type: kind === 'remind' ? 'send_reminder' : 'cancel_invoice', data: { number: u.inv.number, clientName: u.inv.clientName, amount: u.inv.amount, currency: u.inv.currency, invoiceId: u.id } });
     log(`Proposed: ${kind} #${u.inv.number}. Drop the tablet in APPROVE to confirm.`);
   } else if (kind === 'sync') log(`#${u.inv.number}: ${u.inv.status} (sample)`);
@@ -319,9 +321,14 @@ function sampleAct(kind, u) {
 }
 async function chat(message) {
   log(`🗣 ${message}`);
-  if (sample) { log('Sample mode: switch to Live data to talk to Gemini.'); return; }
+  quest('chat');
+  const wasSample = sample;
+  if (sample && !backendOk) { log('Offline sample mode: the agent needs the live backend.'); return; }
   const r = await api('/api/chat', { message });
-  state = r.state; speak(r.reply); log(r.reply);
+  speak(r.reply); log(r.reply);
+  if (wasSample && !r.state.invoices.length && !r.state.pending.length) return; // live account still empty: keep the sample room
+  if (wasSample) { sample = false; sampleWhy = ''; $('#sample').textContent = 'Sample data'; syncSampleLabel(); log('Switched to live data.'); }
+  state = r.state;
   if (r.proposals?.length) log(`${r.proposals.length} approval tablet(s) are on the table. Drop one in APPROVE to send it to PayPal.`);
   lastSig = ''; render();
 }
@@ -364,6 +371,7 @@ function grab(obj, holder) {
   held.add(obj); holder.attach(obj);
   const f = flying.findIndex((x) => x.obj === obj); if (f >= 0) flying.splice(f, 1);
   showDetail(obj.userData); buzz(0.4, 30);
+  if (obj.userData.kind === 'invoice') quest('grab');
 }
 function release(obj, velocity) {
   if (velocity.length() > 1.2) whoosh(Math.min(1, velocity.length() / 5));
@@ -384,7 +392,8 @@ for (let i = 0; i < 2; i++) {
     tmpM.identity().extractRotation(c.matrixWorld);
     const o = hitTest(new THREE.Vector3().setFromMatrixPosition(c.matrixWorld), new THREE.Vector3(0, 0, -1).applyMatrix4(tmpM));
     if (o) { st.obj = o; st.hist = []; grab(o, c); return; }
-    if (micOrb && hitTestOrb(c)) toggleMic();
+    if (micOrb && hitTestOrb(c)) return toggleMic();
+    const b = raycaster.intersectObjects(clickables)[0]; if (b) pressButton(b.object);
   });
   c.addEventListener('selectend', () => { if (st.obj) { release(st.obj, velocityOf(st.hist)); st.obj = null; } });
   scene.add(c);
@@ -418,7 +427,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   raycaster.setFromCamera(ndc, camera);
   if (micOrb && raycaster.intersectObject(micOrb).length) { e.stopImmediatePropagation(); return toggleMic(); }
   const o = hitTest(raycaster.ray.origin, raycaster.ray.direction);
-  if (!o) return;
+  if (!o) { const b = raycaster.intersectObjects(clickables)[0]; if (b) { e.stopImmediatePropagation(); pressButton(b.object); } return; }
   e.stopImmediatePropagation(); // keep OrbitControls from rotating while we drag
   controls.enabled = false;
   const wp = o.getWorldPosition(new THREE.Vector3());
@@ -487,7 +496,7 @@ function speak(text) {
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false;
 const micOrb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 24, 16), new THREE.MeshStandardMaterial({ color: 0x5b8cff, emissive: 0x2244aa, emissiveIntensity: 0.6 }));
-micOrb.position.set(0.42, 1.05, -0.5);
+micOrb.position.set(0.78, 1.0, -0.62);
 scene.add(micOrb);
 const micLab = panel(0.3, 0.07, 256); micLab.draw((g, W) => { g.fillStyle = '#cfd6ee'; g.font = '28px system-ui'; g.textAlign = 'center'; g.fillText('🎙 talk to agent', W / 2, 40); });
 micLab.position.y = 0.11; micOrb.add(micLab);
@@ -514,7 +523,87 @@ $('#match').onclick = async () => {
   if (sample) return log('Payment matching uses PayPal Transaction Search; it needs the live backend.');
   try { log('Searching PayPal transactions…'); const r = await api('/api/reconcile', {}); state = r.state; lastSig = ''; render(); log(`Scanned ${r.scanned} transactions: ${r.suggestions.length} match(es) are now approval tablets.`); } catch (e) { log(`⚠️ ${e.message}`); }
 };
-$('#sample').onclick = () => { sample = !sample; $('#sample').textContent = sample ? 'Live data' : 'Sample data'; lastSig = ''; if (sample) { state = sampleState(); render(); } else refresh(); };
+function setSample(on, why = '') {
+  sample = on; sampleWhy = why; $('#sample').textContent = on ? 'Live data' : 'Sample data'; syncSampleLabel(); lastSig = '';
+  if (on) { state = sampleState(); render(); } else refresh();
+}
+$('#sample').onclick = () => setSample(!sample);
+
+// ---------- in-room control console (the HTML bar is invisible inside a headset) ----------
+const clickables = [];
+const consoleRow = new THREE.Group(); consoleRow.position.set(0.22, 0.7, -0.7); consoleRow.rotation.x = -0.6; scene.add(consoleRow);
+function button3d(label, color, x, fn) {
+  const b = panel(0.31, 0.1, 512);
+  b.userData.fn = fn;
+  b.userData.paint = (text) => b.draw((g, W, H) => { card(g, W, H, color); g.fillStyle = '#fff'; g.font = 'bold 46px system-ui'; g.textAlign = 'center'; g.fillText(text, W / 2, H * 0.64); });
+  b.userData.paint(label); b.position.x = x; consoleRow.add(b); clickables.push(b); return b;
+}
+button3d('⚡ Chase overdue', '#5c2a12f2', -0.495, () => $('#chase').click());
+button3d('📣 Briefing', '#16306af2', -0.165, () => $('#brief').click());
+button3d('🔍 Match payments', '#16306af2', 0.165, () => $('#match').click());
+const sampleBtn3d = button3d('Sample data', '#2a2f4af2', 0.495, () => $('#sample').click());
+function syncSampleLabel() { sampleBtn3d.userData.paint(sample ? 'Live data' : 'Sample data'); }
+function pressButton(b) {
+  b.scale.setScalar(0.88); setTimeout(() => b.scale.setScalar(1), 140); blip(); buzz(0.5, 30);
+  b.userData.fn();
+}
+function blip() {
+  try {
+    audio ||= new AudioContext(); const o = audio.createOscillator(); const g = audio.createGain(); o.type = 'triangle'; o.frequency.value = 660;
+    g.gain.setValueAtTime(0.15, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.12);
+    o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.13);
+  } catch { /* no audio */ }
+}
+
+// ---------- guided tutorial ----------
+const QUEST = [['grab', 'Grab an invoice (trigger, pinch or mouse)'], ['remind', 'Throw it into the Remind bin'], ['approve', 'Drop the tablet on APPROVE'], ['chat', 'Ask the agent (mic orb or text box)'], ['chase', 'Press “Chase overdue”']];
+const questDone = new Set();
+const questPanel = panel(0.9, 0.5, 768);
+questPanel.position.set(-1.55, 1.6, -1.05); questPanel.rotation.y = Math.PI / 3.5; scene.add(questPanel);
+function drawQuest() {
+  questPanel.draw((g, W, H) => {
+    card(g, W, H, '#10243ef2');
+    g.fillStyle = '#7fe0ff'; g.font = 'bold 40px system-ui'; g.fillText(`Get started  ${questDone.size}/${QUEST.length}`, 30, 62);
+    g.font = '34px system-ui';
+    const next = QUEST.find((q) => !questDone.has(q[0]));
+    QUEST.forEach(([k, text], i) => {
+      const done = questDone.has(k);
+      g.fillStyle = done ? '#4cd98a' : next && next[0] === k ? '#ffffff' : '#7d8bbd';
+      g.fillText(`${done ? '✔' : next && next[0] === k ? '➜' : '○'}  ${text}`, 30, 128 + i * 58);
+    });
+  });
+}
+drawQuest();
+function quest(evt) {
+  if (questDone.has(evt) || !QUEST.some((q) => q[0] === evt)) return;
+  questDone.add(evt); drawQuest();
+  if (questDone.size === QUEST.length) { chime(); log('🎓 Tutorial complete. You know everything now.'); setTimeout(() => { questPanel.visible = false; }, 8000); }
+}
+
+// ---------- 4-week cash forecast ----------
+const forecastPanel = panel(0.9, 0.42, 768);
+forecastPanel.position.set(1.05, 2.45, -1.85); forecastPanel.rotation.y = -0.35; scene.add(forecastPanel);
+function drawForecast(s) {
+  const names = ['Late', 'This wk', '+1 wk', '+2 wk', 'Later']; const sums = [0, 0, 0, 0, 0];
+  for (const i of s.invoices || []) {
+    if (!['SENT', 'OVERDUE'].includes(i.status) || !i.dueDate) continue;
+    const d = (new Date(i.dueDate + 'T23:59:59Z') - Date.now()) / DAY;
+    sums[d < 0 ? 0 : Math.min(4, 1 + Math.floor(d / 7))] += i.amount;
+  }
+  const max = Math.max(1, ...sums);
+  forecastPanel.draw((g, W, H) => {
+    card(g, W, H);
+    g.fillStyle = '#8fb0ff'; g.font = 'bold 34px system-ui'; g.fillText('Cash expected in', 26, 52);
+    g.textAlign = 'right'; g.fillStyle = '#fff'; g.fillText(fmt(sums.reduce((a, b) => a + b, 0)), W - 26, 52); g.textAlign = 'center';
+    const bw = (W - 80) / 5;
+    sums.forEach((v, i) => {
+      const x = 40 + i * bw, h = 170 * v / max;
+      g.fillStyle = i === 0 ? '#ff7c8a' : '#5bff9c'; g.fillRect(x + 14, 262 - h, bw - 28, h);
+      g.fillStyle = '#fff'; g.font = '24px system-ui'; if (v) g.fillText(fmt(v), x + bw / 2, 252 - h);
+      g.fillStyle = '#aab4d4'; g.fillText(names[i], x + bw / 2, 298);
+    });
+  });
+}
 
 // ---------- XR entry buttons (VR and passthrough MR) ----------
 const vrBtn = VRButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] });
@@ -561,7 +650,7 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
   hoverMouse = hitTest(raycaster.ray.origin, raycaster.ray.direction);
-  renderer.domElement.style.cursor = hoverMouse ? 'grab' : '';
+  renderer.domElement.style.cursor = hoverMouse ? 'grab' : raycaster.intersectObjects(clickables).length ? 'pointer' : '';
 });
 function hoveredSet() {
   const s = new Set(); if (hoverMouse) s.add(hoverMouse);
@@ -651,6 +740,7 @@ function levelUp(n) {
 
 // One click: propose a reminder for every overdue invoice (each still needs approval).
 $('#chase').onclick = async () => {
+  quest('chase');
   const od = (state?.invoices || []).filter((i) => i.status === 'OVERDUE');
   if (!od.length) return log('Nothing is overdue. 🎉');
   if (sample) { for (const inv of od) sampleAct('remind', { inv, id: inv.id }); return; }
@@ -664,7 +754,7 @@ composer.addPass(new RenderPass(scene, camera));
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.45, 0.75));
 composer.addPass(new OutputPass());
 addEventListener('resize', () => composer.setSize(innerWidth, innerHeight));
-let intro = 0;
+let intro = new URLSearchParams(location.search).has('nointro') ? 1 : 0;
 const introFrom = new THREE.Vector3(0, 7, 9), introTo = camera.position.clone();
 const shake = { amt: 0 };
 renderer.setAnimationLoop(() => {
@@ -695,6 +785,6 @@ renderer.setAnimationLoop(() => {
 (async () => {
   try { status = await api('/api/status'); } catch { /* handled in refresh */ }
   await refresh();
-  if (!sample && !state.invoices.length) log('No invoices yet. Ask the agent below, e.g. “Invoice Acme ap@acme.com 300 USD for logo work”, or press Sample data.');
+  if (!sample && !state.invoices.length && !state.pending.length) { setSample(true, 'your live account has no invoices yet'); log('Showing sample data because the live account is empty. Ask the agent for a real invoice and the room switches to live.'); }
   setInterval(refresh, 6000);
 })();

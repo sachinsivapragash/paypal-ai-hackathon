@@ -22,6 +22,11 @@ Hold your unpaid invoices in your hands: a mixed-reality cash-flow room where yo
 - **Chase all overdue:** one button proposes a reminder for every overdue invoice. Each one still needs your approval.
 - **Game feel:** a collection combo meter for acting quickly, a stream of particles along the shelf that speeds up with the money outstanding, red alarm rings under overdue invoices, coin bursts, throw and impact sounds, and (on desktop) a glow effect and an opening camera fly-in.
 
+- **Works fully inside the headset:** a console of physical buttons (Chase overdue, Briefing, Match payments, Sample/Live data) sits in front of you, so nothing depends on the 2D page.
+- **Guided tutorial:** a five-step "Get started" panel ticks off as you grab, throw, approve, talk and chase.
+- **Cash forecast wall:** bars for money that is late, due this week, next week and later.
+- **Instant demo:** if the connected account has no invoices, the room loads clearly labelled sample data, and switches to live data as soon as the agent creates a real invoice.
+
 ## How it's built
 - three.js WebXR (`immersive-vr` and `immersive-ar`, hand tracking, haptics) in `public/vr/`, served by a Node.js backend.
 - Live connections: the PayPal sandbox (Invoicing v2, Orders v2, Transaction Search, verified webhooks) and Google Gemini function calling.
