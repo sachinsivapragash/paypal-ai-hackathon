@@ -8,6 +8,10 @@ import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const $ = (s) => document.querySelector(s);
 const COLORS = { SENT: 0xffb347, OVERDUE: 0xff5c6c, PAID: 0x4cd98a, DRAFT: 0x8892b0, CANCELLED: 0x555d78 };
@@ -51,6 +55,15 @@ room.add(floor);
 const grid = new THREE.PolarGridHelper(6, 16, 12, 64, 0x2a3558, 0x1b2340);
 grid.position.y = 0.001;
 room.add(grid);
+{ // starfield (hidden in passthrough MR with the rest of the room)
+  const n = 1800, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(18 + Math.random() * 22); v.y = Math.abs(v.y) * 0.9 - 2; pos.set([v.x, v.y, v.z], i * 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  room.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9fb6ff, size: 0.06, sizeAttenuation: true })));
+}
+const neon = new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.012, 8, 128), new THREE.MeshBasicMaterial({ color: 0x3d7bff }));
+neon.rotation.x = -Math.PI / 2; neon.position.y = 0.01; room.add(neon);
+const alarmLight = new THREE.PointLight(0xff2244, 0, 4); alarmLight.position.set(0, 1.6, -1.2); scene.add(alarmLight);
 
 // ---------- canvas text panels ----------
 function panel(w, h, px = 512) {
@@ -139,6 +152,7 @@ for (const t of targets) if (t.accepts === 'pending') t.group.rotation.y = Math.
 let state = null; let sample = false; let status = {};
 const grabbables = new Map(); // id -> mesh
 let lastSig = '';
+let roseOnce = false;
 const prevStatus = new Map();
 
 async function api(path, body) {
@@ -197,6 +211,7 @@ function render() {
   // Invoices on a timeline arc: most overdue on the left, due-latest on the right.
   const open = s.invoices.filter((i) => ['SENT', 'OVERDUE', 'PAID'].includes(i.status)).sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || '')).slice(0, 18);
   const max = Math.max(1, ...open.map((i) => i.amount));
+  const introRise = !roseOnce && open.length > 0; if (introRise) roseOnce = true;
   open.forEach((inv, k) => {
     if ([...held].some((m) => m.userData.id === inv.id)) return;
     const a = open.length === 1 ? 0 : -0.9 + 1.8 * k / (open.length - 1);
@@ -210,6 +225,13 @@ function render() {
     mesh.position.set(Math.sin(a) * 1.3, 0.75 + h / 2, -Math.cos(a) * 1.3 + 0.1);
     mesh.lookAt(0, mesh.position.y, 0.4);
     mesh.userData = { id: inv.id, kind: 'invoice', inv, home: mesh.position.clone(), homeQ: mesh.quaternion.clone(), h };
+    if (inv.status === 'OVERDUE') {
+      for (let r = 0; r < 2; r++) {
+        const ring = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.135, 48), new THREE.MeshBasicMaterial({ color: 0xff2244, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = -h / 2 + 0.005; ring.userData.alarm = r * 0.5; ring.raycast = () => {}; mesh.add(ring);
+      }
+    }
+    if (introRise) { mesh.position.y -= 1.4; homing.push({ o: mesh, t: -0.6 - k * 0.12, from: mesh.position.clone(), fq: mesh.quaternion.clone() }); }
     invoiceGroup.add(mesh); grabbables.set(inv.id, mesh);
   });
   // shelf under the arc
@@ -266,6 +288,7 @@ function drawAudit(s) {
 // ---------- actions (bins / slots) ----------
 async function act(target, obj) {
   const u = obj.userData;
+  bumpCombo(u);
   buzz(0.8, 60);
   try {
     if (sample) return sampleAct(target.kind, u);
@@ -343,6 +366,7 @@ function grab(obj, holder) {
   showDetail(obj.userData); buzz(0.4, 30);
 }
 function release(obj, velocity) {
+  if (velocity.length() > 1.2) whoosh(Math.min(1, velocity.length() / 5));
   held.delete(obj); scene.attach(obj);
   flying.push({ obj, vel: velocity.clone(), t: 0 });
 }
@@ -414,7 +438,7 @@ addEventListener('pointerup', (e) => {
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera); raycaster.far = 20;
   const tgt = targets.find((t) => t.accepts === mouse.obj.userData.kind && raycaster.intersectObjects([t.mesh, t.label]).length);
-  if (tgt) { const o = mouse.obj; held.delete(o); scene.attach(o); o.visible = false; mouse.obj = null; controls.enabled = true; pulseTarget(tgt); act(tgt, o); return; }
+  if (tgt) { const o = mouse.obj; held.delete(o); scene.attach(o); o.visible = false; mouse.obj = null; controls.enabled = true; pulseTarget(tgt); impact(tgt); act(tgt, o); return; }
   release(mouse.obj, velocityOf(mouse.hist).multiplyScalar(0.6)); mouse.obj = null; controls.enabled = true;
 });
 
@@ -428,7 +452,7 @@ function stepFlying(dt) {
       if (t.accepts !== o.userData.kind) continue;
       const c = t.group.position; const dx = o.position.x - c.x, dz = o.position.z - c.z;
       if (dx * dx + dz * dz < (t.radius + 0.05) ** 2 && o.position.y < c.y + t.top + 0.15) {
-        flying.splice(k, 1); pulseTarget(t); o.visible = false; act(t, o); break;
+        flying.splice(k, 1); pulseTarget(t); impact(t); o.visible = false; act(t, o); break;
       }
     }
     if (!flying.includes(f)) continue;
@@ -438,7 +462,7 @@ function stepFlying(dt) {
     }
   }
   for (let k = homing.length - 1; k >= 0; k--) {
-    const h = homing[k]; h.t = Math.min(1, h.t + dt * 1.8); const e = 1 - (1 - h.t) ** 3;
+    const h = homing[k]; h.t = Math.min(1, h.t + dt * 1.8); if (h.t < 0) continue; const e = 1 - (1 - h.t) ** 3;
     h.o.position.lerpVectors(h.from, h.o.userData.home, e); h.o.quaternion.slerpQuaternions(h.fq, h.o.userData.homeQ, e);
     if (h.t >= 1) homing.splice(k, 1);
   }
@@ -496,7 +520,7 @@ $('#sample').onclick = () => { sample = !sample; $('#sample').textContent = samp
 const vrBtn = VRButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] });
 const arBtn = ARButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] });
 for (const b of [vrBtn, arBtn]) { b.style.bottom = 'auto'; b.style.top = '12px'; }
-vrBtn.style.left = 'calc(50% - 150px)'; arBtn.style.left = 'calc(50% + 10px)';
+vrBtn.style.left = arBtn.style.left = 'auto'; vrBtn.style.right = '162px'; arBtn.style.right = '12px';
 vrBtn.style.width = arBtn.style.width = '140px';
 document.body.append(vrBtn, arBtn);
 renderer.xr.addEventListener('sessionstart', () => {
@@ -549,8 +573,100 @@ function hoveredSet() {
   return s;
 }
 
+// ---------- intensity: combo meter, cash river, alarms, impacts ----------
+const comboPanel = panel(0.9, 0.42, 512);
+comboPanel.position.set(-1.05, 2.45, -1.85); comboPanel.rotation.y = 0.35; scene.add(comboPanel);
+const combo = { n: 0, best: 0, moved: 0, last: 0 };
+function drawCombo(flash = 0) {
+  comboPanel.draw((g, W, H) => {
+    card(g, W, H, flash ? '#3a1d5cf2' : '#0f1630ee');
+    g.fillStyle = '#b9a2ff'; g.font = 'bold 30px system-ui'; g.fillText('COLLECTION COMBO', 24, 50);
+    g.fillStyle = combo.n >= 3 ? '#ffd34d' : '#ffffff'; g.font = 'bold 110px system-ui'; g.fillText(`x${combo.n}`, 24, 170);
+    g.fillStyle = '#cfd6ee'; g.font = '26px system-ui'; g.fillText(`best x${combo.best}`, 290, 110); g.fillText(`${fmt(combo.moved)} handled`, 290, 150);
+    g.fillStyle = '#7d8bbd'; g.font = '20px system-ui'; g.fillText('act again within 20s to keep the streak', 24, 210);
+  });
+}
+drawCombo();
+function bumpCombo(u) {
+  const now = performance.now();
+  combo.n = now - combo.last < 20000 ? combo.n + 1 : 1; combo.last = now; combo.best = Math.max(combo.best, combo.n);
+  combo.moved += u.inv?.amount || u.p?.data?.amount || 0;
+  drawCombo(1); setTimeout(() => drawCombo(), 250);
+  if (combo.n >= 3) levelUp(combo.n);
+}
+// cash river: particles streaming along the shelf; speed tracks money outstanding, colour warns of overdue
+const riverN = 260, riverPos = new Float32Array(riverN * 3), riverT = new Float32Array(riverN);
+for (let i = 0; i < riverN; i++) riverT[i] = Math.random();
+const riverGeo = new THREE.BufferGeometry(); riverGeo.setAttribute('position', new THREE.BufferAttribute(riverPos, 3));
+const riverMat = new THREE.PointsMaterial({ color: 0x5bff9c, size: 0.022, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+const river = new THREE.Points(riverGeo, riverMat); river.frustumCulled = false; scene.add(river);
+function stepIntensity(dt, t) {
+  const sm = state?.summary || {}; const out = sm.outstanding || 0, od = sm.overdue || 0;
+  const speed = 0.05 + Math.min(0.35, out / 20000);
+  riverMat.color.setHex(od > 0 ? 0xffb347 : 0x5bff9c);
+  for (let i = 0; i < riverN; i++) {
+    riverT[i] = (riverT[i] + dt * speed * (0.6 + (i % 7) / 10)) % 1;
+    const a = 0.95 - 1.9 * riverT[i]; const rad = 1.16 + Math.sin(t * 3 + i) * 0.02;
+    riverPos.set([Math.sin(a) * rad, 0.76 + (i % 5) * 0.008 + Math.sin(t * 2 + i * 0.7) * 0.01, -Math.cos(a) * rad + 0.1], i * 3);
+  }
+  riverGeo.attributes.position.needsUpdate = true;
+  const share = out ? od / out : 0; // overdue alarm: rings ripple out, red light breathes with the overdue share
+  alarmLight.intensity = share ? (0.6 + 2.4 * share) * (0.5 + 0.5 * Math.sin(t * 5)) : 0;
+  for (const m of invoiceGroup.children) for (const c of m.children) if (c.userData.alarm !== undefined) {
+    const f = (t * 0.9 + c.userData.alarm) % 1; c.scale.setScalar(1 + f * 2.2); c.material.opacity = 1 - f;
+  }
+  neon.material.color.setHSL(share ? 0.98 : 0.62, 1, 0.45 + 0.15 * Math.sin(t * 2));
+  if (combo.n && performance.now() - combo.last > 20000) { combo.n = 0; drawCombo(); }
+}
+function impact(t) {
+  shake.amt = 0.06; thud(); buzz(1, 90);
+  coinBurst(t.group.position.clone().add(new THREE.Vector3(0, t.top + 0.05, 0)), 10);
+}
+function noiseBuf(sec) { const b = audio.createBuffer(1, audio.sampleRate * sec, audio.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
+function whoosh(power) {
+  try {
+    audio ||= new AudioContext(); const src = audio.createBufferSource(); src.buffer = noiseBuf(0.5); const f = audio.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.2;
+    f.frequency.setValueAtTime(300, audio.currentTime); f.frequency.exponentialRampToValueAtTime(2400, audio.currentTime + 0.35);
+    const g = audio.createGain(); g.gain.setValueAtTime(0.0001, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.25 * power, audio.currentTime + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.45);
+    src.connect(f).connect(g).connect(audio.destination); src.start();
+  } catch { /* no audio */ }
+}
+function thud() {
+  try {
+    audio ||= new AudioContext(); const o = audio.createOscillator(); const g = audio.createGain(); o.type = 'sine';
+    o.frequency.setValueAtTime(140, audio.currentTime); o.frequency.exponentialRampToValueAtTime(45, audio.currentTime + 0.25);
+    g.gain.setValueAtTime(0.5, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.3);
+    o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.32);
+  } catch { /* no audio */ }
+}
+function levelUp(n) {
+  try {
+    audio ||= new AudioContext();
+    [523, 659, 784, 1046].forEach((f, i) => { const o = audio.createOscillator(); const g = audio.createGain(); o.type = 'square'; o.frequency.value = f * (1 + (n - 3) * 0.06);
+      const at = audio.currentTime + i * 0.07; g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.08, at + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.18);
+      o.connect(g).connect(audio.destination); o.start(at); o.stop(at + 0.2); });
+  } catch { /* no audio */ }
+  log(`🔥 Combo x${n}! Keep going.`);
+}
+
+// One click: propose a reminder for every overdue invoice (each still needs approval).
+$('#chase').onclick = async () => {
+  const od = (state?.invoices || []).filter((i) => i.status === 'OVERDUE');
+  if (!od.length) return log('Nothing is overdue. 🎉');
+  if (sample) { for (const inv of od) sampleAct('remind', { inv, id: inv.id }); return; }
+  try { await chat(`Send a reminder for each of these overdue invoices: ${od.map((i) => '#' + i.number).join(', ')}`); } catch (e) { log(`⚠️ ${e.message}`); }
+};
+
 // ---------- loop ----------
 const clock = new THREE.Clock();
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.45, 0.75));
+composer.addPass(new OutputPass());
+addEventListener('resize', () => composer.setSize(innerWidth, innerHeight));
+let intro = 0;
+const introFrom = new THREE.Vector3(0, 7, 9), introTo = camera.position.clone();
+const shake = { amt: 0 };
 renderer.setAnimationLoop(() => {
   const dt = Math.min(0.05, clock.getDelta()); const t = clock.elapsedTime;
   for (const s of xrInputs) if (s.obj) { s.hist.push({ p: s.obj.getWorldPosition(new THREE.Vector3()), t }); if (s.hist.length > 6) s.hist.shift(); }
@@ -563,7 +679,16 @@ renderer.setAnimationLoop(() => {
   for (const o of orbGroup.children) o.position.y += Math.sin(t * 1.5 + o.userData.bob) * 0.0008;
   micOrb.scale.setScalar(listening ? 1 + 0.15 * Math.sin(t * 10) : 1);
   for (const lab of targets.map((x) => x.label)) lab.quaternion.copy(camera.quaternion);
-  renderer.render(scene, camera);
+  stepIntensity(dt, t);
+  if (intro < 1 && !renderer.xr.isPresenting) { intro = Math.min(1, t / 2.6); const e = 1 - (1 - intro) ** 4; camera.position.lerpVectors(introFrom, introTo, e); controls.update(); }
+  if (renderer.xr.isPresenting) { renderer.render(scene, camera); } // glow pass is desktop-only: post-processing is too heavy in a headset
+  else {
+    const off = shake.amt > 0.001 ? new THREE.Vector3((Math.random() - 0.5) * shake.amt, (Math.random() - 0.5) * shake.amt, 0) : null;
+    if (off) camera.position.add(off);
+    composer.render();
+    if (off) camera.position.sub(off);
+    shake.amt *= 0.86;
+  }
 });
 
 // ---------- boot ----------

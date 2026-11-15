@@ -18,10 +18,12 @@
   button{background:#1b2650;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;font:inherit}
   button:hover{border-color:var(--acc)}
   button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
-  #log{right:12px;top:64px;width:300px;max-height:45vh;overflow:auto;font-size:12px}
+  #log{right:12px;top:86px;width:300px;max-height:45vh;overflow:auto;font-size:12px}
+  #VRButton,#ARButton{left:auto!important;top:12px!important;bottom:auto!important;width:140px!important}
+  #VRButton{right:162px!important}#ARButton{right:12px!important}
   #log:empty{display:none}
   #log div{padding:3px 0;border-bottom:1px solid #1b2340}
-  @media (max-width:700px){#log{display:none}#hud{width:calc(100% - 48px)}}
+  @media (max-width:700px){#VRButton,#ARButton{top:70px!important}#log{display:none}#hud{width:calc(100% - 48px)}}
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
@@ -39,6 +41,7 @@
   <button id="mic" title="Hold to talk to the Gemini agent">🎙 Talk</button>
   <input id="say" placeholder="Ask the agent… e.g. “Invoice Acme ap@acme.com 300 USD for logos”">
   <button id="send" class="pri">Send</button>
+  <button id="chase" title="Propose a reminder for every overdue invoice">⚡ Chase all overdue</button>
   <button id="brief">📣 Briefing</button>
   <button id="match">🔍 Match payments</button>
   <button id="sample">Sample data</button>

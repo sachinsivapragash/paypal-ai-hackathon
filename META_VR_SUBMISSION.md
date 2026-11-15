@@ -19,10 +19,13 @@ Hold your unpaid invoices in your hands: a mixed-reality cash-flow room where yo
 - **Weekly briefing** (Gemini, read aloud) and **payment matching** (PayPal Transaction Search), each available with one button.
 - **Mixed reality:** passthrough mode puts the ledger on your real desk. Also supports VR mode, controllers or hand tracking (pinch), haptics, and a desktop and phone fallback.
 
+- **Chase all overdue:** one button proposes a reminder for every overdue invoice. Each one still needs your approval.
+- **Game feel:** a collection combo meter for acting quickly, a stream of particles along the shelf that speeds up with the money outstanding, red alarm rings under overdue invoices, coin bursts, throw and impact sounds, and (on desktop) a glow effect and an opening camera fly-in.
+
 ## How it's built
-- three.js WebXR (`immersive-vr` and `immersive-ar`, hand tracking, haptics) in `public/vr/`, served by the DuePilot Node.js backend.
+- three.js WebXR (`immersive-vr` and `immersive-ar`, hand tracking, haptics) in `public/vr/`, served by a Node.js backend.
 - Live connections: the PayPal sandbox (Invoicing v2, Orders v2, Transaction Search, verified webhooks) and Google Gemini function calling.
-- All writes go through DuePilot's single approval endpoint, which uses idempotency keys.
+- All writes go through a single approval endpoint, which uses idempotency keys.
 
 ## Try it
 - In the main web app, the header has a **🥽 Tallyspace VR** button.
