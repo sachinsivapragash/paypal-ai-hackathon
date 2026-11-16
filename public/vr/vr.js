@@ -13,6 +13,16 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
+// ?emulate loads Meta's open-source WebXR emulator (IWER) as a Quest 3 with hand tracking, for testing and
+// recording on a computer. It is never loaded otherwise.
+if (new URLSearchParams(location.search).has('emulate')) {
+  const { XRDevice, metaQuest3 } = await import('https://cdn.jsdelivr.net/npm/iwer@2.7.0/+esm');
+  const dev = new XRDevice(metaQuest3, { stereoEnabled: false });
+  dev.primaryInputMode = 'hand';
+  dev.installRuntime({ forceInstall: true });
+  window.xrdev = dev;
+}
+
 const $ = (s) => document.querySelector(s);
 const COLORS = { SENT: 0xffb347, OVERDUE: 0xff5c6c, PAID: 0x4cd98a, DRAFT: 0x8892b0, CANCELLED: 0x555d78 };
 const RISK = { high: 0xff5c6c, medium: 0xffb347, low: 0x4cd98a };
@@ -97,7 +107,7 @@ agentPanel.position.set(0, 1.85, -2.0);
 scene.add(agentPanel);
 agentPanel.set = (msg) => agentPanel.draw((g, W, H) => {
   card(g, W, H);
-  g.fillStyle = '#8fb0ff'; g.font = 'bold 34px system-ui'; g.fillText('Tallyspace agent (Gemini)', 30, 56);
+  g.fillStyle = '#8fb0ff'; g.font = 'bold 34px system-ui'; g.fillText('Tallyspace assistant', 30, 56);
   g.fillStyle = '#e8ecf6'; g.font = '30px system-ui'; wrapText(g, msg, 30, 110, W - 60, 38, 9);
 });
 agentPanel.set('Say or type a request. Throw an invoice into a bin to propose an action.');
@@ -187,6 +197,7 @@ function summaryOf(inv) {
 }
 
 async function refresh() {
+  if (typeof paused !== 'undefined' && paused) return;
   if (sample) return render();
   try { state = await api('/api/state'); backendOk = true; render(); }
   catch (e) { backendOk = false; setSample(true, 'backend unreachable'); }
@@ -371,6 +382,8 @@ function hitTest(origin, dir) {
   const objs = [...grabbables.values()].filter((m) => !held.has(m));
   const hit = raycaster.intersectObjects(objs, true)[0];
   if (!hit) return null;
+  const b = raycaster.intersectObjects(clickables.filter((x) => x.visible))[0];
+  if (b && b.distance < hit.distance) return null; // a button in front of the object wins
   let o = hit.object; while (o && !o.userData.kind) o = o.parent;
   return o;
 }
@@ -400,12 +413,24 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener('connected', (e) => { st.gamepad = e.data.gamepad; });
   c.addEventListener('selectstart', () => {
     tmpM.identity().extractRotation(c.matrixWorld);
-    const o = hitTest(new THREE.Vector3().setFromMatrixPosition(c.matrixWorld), new THREE.Vector3(0, 0, -1).applyMatrix4(tmpM));
+    if (mr.placing && mr.reticle.visible) return placeLedger();
+    const origin = new THREE.Vector3().setFromMatrixPosition(c.matrixWorld), dir = new THREE.Vector3(0, 0, -1).applyMatrix4(tmpM);
+    const o = hitTest(origin, dir);
     if (o) { st.obj = o; st.hist = []; grab(o, c); return; }
     if (micOrb && hitTestOrb(c)) return toggleMic();
-    const b = raycaster.intersectObjects(clickables)[0]; if (b) pressButton(b.object);
+    raycaster.set(origin, dir); raycaster.far = 12;
+    const b = raycaster.intersectObjects(clickables.filter((x) => x.visible))[0]; if (b) pressButton(b.object);
   });
-  c.addEventListener('selectend', () => { if (st.obj) { release(st.obj, velocityOf(st.hist)); st.obj = null; } });
+  c.addEventListener('selectend', () => {
+    if (!st.obj) return;
+    const o = st.obj; st.obj = null;
+    // Seated / hands-first: no need to throw. Point at a bin or pad and let go (pinch release).
+    tmpM.identity().extractRotation(c.matrixWorld);
+    raycaster.set(new THREE.Vector3().setFromMatrixPosition(c.matrixWorld), new THREE.Vector3(0, 0, -1).applyMatrix4(tmpM)); raycaster.far = 12;
+    const tgt = targets.find((t) => t.accepts === o.userData.kind && raycaster.intersectObjects([t.mesh, t.label]).length);
+    if (tgt) { held.delete(o); scene.attach(o); o.visible = false; pulseTarget(tgt); impact(tgt); act(tgt, o); return; }
+    release(o, velocityOf(st.hist));
+  });
   scene.add(c);
   const grip = renderer.xr.getControllerGrip(i);
   grip.add(controllerModels.createControllerModel(grip)); scene.add(grip);
@@ -437,7 +462,7 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   raycaster.setFromCamera(ndc, camera);
   if (micOrb && raycaster.intersectObject(micOrb).length) { e.stopImmediatePropagation(); return toggleMic(); }
   const o = hitTest(raycaster.ray.origin, raycaster.ray.direction);
-  if (!o) { const b = raycaster.intersectObjects(clickables)[0]; if (b) { e.stopImmediatePropagation(); pressButton(b.object); } return; }
+  if (!o) { raycaster.far = 12; const b = raycaster.intersectObjects(clickables.filter((x) => x.visible))[0]; if (b) { e.stopImmediatePropagation(); pressButton(b.object); } return; }
   e.stopImmediatePropagation(); // keep OrbitControls from rotating while we drag
   controls.enabled = false;
   const wp = o.getWorldPosition(new THREE.Vector3());
@@ -560,6 +585,7 @@ button3d('⚡ Chase overdue', '#5c2a12f2', -0.495, () => $('#chase').click());
 button3d('📣 Briefing', '#16306af2', -0.165, () => $('#brief').click());
 button3d('🔍 Match payments', '#16306af2', 0.165, () => $('#match').click());
 const sampleBtn3d = button3d('Sample data', '#2a2f4af2', 0.495, () => $('#sample').click());
+const moveBtn3d = button3d('📍 Move ledger', '#0f4a4af2', 0, () => startPlacing(), consoleRow, -0.12); moveBtn3d.visible = false;
 // Quick questions: one-press prompts for the agent (speech recognition is not available in every headset browser).
 const askCol = new THREE.Group(); askCol.position.set(1.08, 0.82, -0.5); askCol.rotation.y = -0.6; scene.add(askCol);
 button3d('❓ Who to chase?', '#3b1f5cf2', 0, () => ask('chase', 'Who should I chase first?'), askCol, 0.12);
@@ -592,10 +618,10 @@ function blip() {
 }
 
 // ---------- guided tutorial ----------
-const QUEST = [['grab', 'Grab an invoice (trigger, pinch or mouse)'], ['remind', 'Throw it into the Remind bin'], ['approve', 'Drop the tablet on APPROVE'], ['chat', 'Ask the agent (mic orb or text box)'], ['chase', 'Press “Chase overdue”']];
+const QUEST = [['grab', 'Pinch an invoice to grab it'], ['remind', 'Point at Remind and let go'], ['approve', 'Drop the tablet on APPROVE'], ['chat', 'Ask a quick question (right)'], ['chase', 'Press “Chase overdue”']];
 const questDone = new Set();
 const questPanel = panel(0.9, 0.5, 768);
-questPanel.position.set(-1.55, 1.6, -1.05); questPanel.rotation.y = Math.PI / 3.5; scene.add(questPanel);
+questPanel.position.set(-1.2, 1.62, -1.25); questPanel.rotation.y = 0.75; scene.add(questPanel);
 function drawQuest() {
   questPanel.draw((g, W, H) => {
     card(g, W, H, '#10243ef2');
@@ -643,17 +669,71 @@ function drawForecast(s) {
 
 // ---------- XR entry buttons (VR and passthrough MR) ----------
 const vrBtn = VRButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] });
-const arBtn = ARButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] });
+const arBtn = ARButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking', 'hit-test'] });
 for (const b of [vrBtn, arBtn]) { b.style.bottom = 'auto'; b.style.top = '12px'; }
 vrBtn.style.left = arBtn.style.left = 'auto'; vrBtn.style.right = '162px'; arBtn.style.right = '12px';
 vrBtn.style.width = arBtn.style.width = '140px';
 document.body.append(vrBtn, arBtn);
+// Mixed reality: your real room is the room. A reticle follows real surfaces; pinch to place the ledger there.
+const mr = { placing: false, source: null, base: null, reticle: new THREE.Mesh(new THREE.RingGeometry(0.09, 0.12, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7fe0ff })) };
+mr.reticle.matrixAutoUpdate = false; mr.reticle.visible = false; scene.add(mr.reticle);
+const ledgerParts = () => [invoiceGroup, pendingGroup, orbGroup, consoleRow, askCol, table, river, micOrb, ...targets.map((t) => t.group)];
+async function startPlacing() {
+  const session = renderer.xr.getSession(); if (!session || renderer.xr.getSession().environmentBlendMode === 'opaque') return log('Placing works in mixed reality (Enter AR).');
+  try {
+    if (!mr.base) mr.base = renderer.xr.getReferenceSpace();
+    renderer.xr.setReferenceSpace(mr.base);
+    if (!mr.source) mr.source = await session.requestHitTestSource({ space: await session.requestReferenceSpace('viewer') });
+    mr.placing = true; for (const g of ledgerParts()) g.visible = false;
+    log('Look at the floor in front of your desk and pinch to place your ledger there.');
+  } catch { log('This headset browser cannot detect surfaces; the ledger stays in front of you.'); }
+}
+function placeLedger() {
+  const p = new THREE.Vector3().setFromMatrixPosition(mr.reticle.matrix);
+  const pose = renderer.xr.getFrame()?.getViewerPose(mr.base); if (!pose) return;
+  const h = pose.transform.position; const d = new THREE.Vector3(p.x - h.x, 0, p.z - h.z);
+  if (d.lengthSq() < 1e-4) d.set(0, 0, -1); d.normalize();
+  const yaw = Math.atan2(-d.x, -d.z); const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+  const o = p.clone().addScaledVector(d, 0.75); // the ledger's centre sits where you pointed
+  renderer.xr.setReferenceSpace(mr.base.getOffsetReferenceSpace(new XRRigidTransform({ x: o.x, y: 0, z: o.z }, { x: q.x, y: q.y, z: q.z, w: q.w })));
+  mr.placing = false; mr.reticle.visible = false; for (const g of ledgerParts()) g.visible = true;
+  chime(); buzz(0.8, 60); quest('place'); log('Ledger placed in your room. Use 📍 Move ledger to put it somewhere else.');
+}
+// Seated or standing: measure the real eye height once and move the room so the shelf sits just below your
+// hands either way (the "airplane seat test": everything stays within about 2 ft).
+const DESIGN_EYE = 1.55;
+async function fitToHeight() {
+  const session = renderer.xr.getSession(); const base = renderer.xr.getReferenceSpace();
+  for (let i = 0; i < 30; i++) {
+    const eyeY = await new Promise((r) => session.requestAnimationFrame((t, f) => r(f.getViewerPose(base)?.transform.position.y))); // read inside the frame callback
+    if (eyeY == null) continue;
+    const dy = eyeY - DESIGN_EYE;
+    if (Math.abs(dy) > 0.08) renderer.xr.setReferenceSpace(base.getOffsetReferenceSpace(new XRRigidTransform({ x: 0, y: dy, z: 0 })));
+    if (dy < -0.2) log('Seated mode: the ledger moved down to your eye level.');
+    return;
+  }
+}
+function stepPlacement() {
+  if (!mr.placing || !mr.source) return;
+  const frame = renderer.xr.getFrame(); const hit = frame?.getHitTestResults(mr.source)[0];
+  const pose = hit?.getPose(mr.base);
+  mr.reticle.visible = !!pose; if (pose) mr.reticle.matrix.fromArray(pose.transform.matrix);
+}
 renderer.xr.addEventListener('sessionstart', () => {
   const ar = renderer.xr.getSession().environmentBlendMode !== 'opaque';
-  room.visible = !ar; scene.background = ar ? null : roomBg; // MR: your real desk becomes the room
-  log(ar ? 'Mixed reality: your receivables are floating in your room.' : 'VR session started.');
+  room.visible = !ar; scene.background = ar ? null : roomBg; // MR: your real room becomes the room
+  moveBtn3d.visible = ar;
+  if (ar) startPlacing(); else { log('VR session started. Pinch or pull the trigger to grab; point at a bin and let go to drop.'); fitToHeight(); }
 });
-renderer.xr.addEventListener('sessionend', () => { room.visible = true; scene.background = roomBg; });
+renderer.xr.addEventListener('sessionend', () => {
+  room.visible = true; scene.background = roomBg; mr.placing = false; mr.reticle.visible = false; mr.source = null; mr.base = null; moveBtn3d.visible = false;
+  for (const g of ledgerParts()) g.visible = true;
+});
+// Clean pause/resume: stop polling while the page or headset session is hidden.
+let paused = false;
+const setPaused = (v) => { paused = v; if (!v) refresh(); };
+document.addEventListener('visibilitychange', () => setPaused(document.hidden));
+renderer.xr.addEventListener('sessionstart', () => renderer.xr.getSession().addEventListener('visibilitychange', (e) => setPaused(e.session.visibilityState === 'hidden')));
 
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
@@ -797,7 +877,7 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(0.05, clock.getDelta()); const t = clock.elapsedTime;
   for (const s of xrInputs) if (s.obj) { s.hist.push({ p: s.obj.getWorldPosition(new THREE.Vector3()), t }); if (s.hist.length > 6) s.hist.shift(); }
   if (mouse.obj) { mouse.hist.push({ p: mouse.holder.position.clone(), t }); if (mouse.hist.length > 6) mouse.hist.shift(); }
-  stepFlying(dt); stepCoins(dt);
+  stepFlying(dt); stepCoins(dt); stepPlacement();
   const hov = hoveredSet();
   for (const m of grabbables.values()) { const target = hov.has(m) || held.has(m) ? 1.12 : 1; m.scale.lerp(new THREE.Vector3(target, target, target), 0.25); }
   for (let k = pulses.length - 1; k >= 0; k--) { const p = pulses[k]; p.life -= dt; p.t.mesh.material.emissiveIntensity = 0.25 + 2 * Math.max(0, p.life); if (p.life <= 0) pulses.splice(k, 1); }
@@ -818,7 +898,15 @@ renderer.setAnimationLoop(() => {
 });
 
 // Dev hook used by scripts/record-vr.js: where an object is on screen.
-window.tallyspace = { locate(key) {
+window.tallyspace = {
+  world(key) {
+    const all = [...grabbables.values()];
+    const o = key === 'overdue' ? all.find((m) => m.userData.inv?.status === 'OVERDUE') : key === 'sent' ? all.find((m) => ['SENT', 'OVERDUE'].includes(m.userData.inv?.status))
+      : key === 'tablet' ? all.find((m) => m.userData.kind === 'pending') : key.startsWith('bin:') ? targets.find((t) => t.kind === key.slice(4))?.mesh : key.startsWith('btn:') ? clickables[+key.slice(4)] : null;
+    return o ? o.getWorldPosition(new THREE.Vector3()).toArray() : null;
+  },
+  ray(i) { const c = renderer.xr.getController(i); tmpM.identity().extractRotation(c.matrixWorld); return { o: new THREE.Vector3().setFromMatrixPosition(c.matrixWorld).toArray(), d: new THREE.Vector3(0, 0, -1).applyMatrix4(tmpM).toArray() }; },
+  locate(key) {
   const all = [...grabbables.values()];
   const o = key === 'overdue' ? all.find((m) => m.userData.inv?.status === 'OVERDUE') : key === 'sent' ? all.find((m) => m.userData.inv?.status === 'SENT')
     : key === 'tablet' ? all.find((m) => m.userData.kind === 'pending') : key.startsWith('bin:') ? targets.find((t) => t.kind === key.slice(4))?.mesh : clickables[+key.slice(4)];
