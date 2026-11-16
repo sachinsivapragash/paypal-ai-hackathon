@@ -118,7 +118,7 @@ const detailPanel = panel(0.6, 0.75, 512);
 detailPanel.position.set(0.8, 1.4, -0.55);
 detailPanel.rotation.y = -Math.PI / 4.5;
 scene.add(detailPanel); detailPanel.visible = false;
-detailPanel.draw((g, W, H) => { card(g, W, H); g.fillStyle = '#aab4d4'; g.font = '28px system-ui'; wrapText(g, 'Grab an invoice to see details and its PayPal scan-to-pay QR code.', 24, 60, W - 48, 36); });
+detailPanel.draw((g, W, H) => { card(g, W, H); g.fillStyle = '#aab4d4'; g.font = '28px system-ui'; wrapText(g, 'Grab an invoice to see details and its scan-to-pay QR code.', 24, 60, W - 48, 36); });
 
 // ---------- drop targets ----------
 const targets = [];
@@ -138,7 +138,7 @@ function addTarget(kind, accepts, label, color, pos, radius = 0.22) {
   targets.push({ kind, accepts, group: g, radius, top: isBin ? 0.45 : 0.06, mesh: m, label: lab });
 }
 addTarget('remind', 'invoice', 'Remind', COLORS.SENT, new THREE.Vector3(-0.5, 0, -0.55), 0.17);
-addTarget('sync', 'invoice', 'Sync PayPal', COLORS.PAID, new THREE.Vector3(0, 0, -0.45), 0.17);
+addTarget('sync', 'invoice', 'Sync status', COLORS.PAID, new THREE.Vector3(0, 0, -0.45), 0.17);
 addTarget('cancel', 'invoice', 'Cancel', COLORS.OVERDUE, new THREE.Vector3(0.5, 0, -0.55), 0.17);
 // approval table on the left
 const table = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.04, 0.6), new THREE.MeshStandardMaterial({ color: 0x223066 }));
@@ -200,7 +200,7 @@ const fmt = (n, c = 'USD') => `${c === 'USD' ? '$' : ''}${Math.round(n).toLocale
 
 function render() {
   const s = state;
-  $('#src').textContent = sample ? `Sample data${sampleWhy ? ' · ' + sampleWhy : ''} (nothing is sent to PayPal)` : `Live · PayPal ${status.paypal || '?'} · AI ${status.ai || '?'}`;
+  $('#src').textContent = sample ? `Sample data${sampleWhy ? ' · ' + sampleWhy : ''} (nothing is sent anywhere)` : `Live · payments ${status.paypal || '?'} · AI ${status.ai || '?'}`;
   // chime + log when an invoice becomes PAID (webhook reconciled)
   for (const i of s.invoices) { const was = prevStatus.get(i.id); if (was && was !== 'PAID' && i.status === 'PAID') { chime(); const m = grabbables.get(i.id); coinBurst(m ? m.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(0, 1.2, -1)); log(`💰 Invoice #${i.number} from ${i.clientName} was paid`); } prevStatus.set(i.id, i.status); }
   drawSummary(s); drawAudit(s); drawForecast(s);
@@ -297,9 +297,9 @@ async function act(target, obj) {
   buzz(0.8, 60);
   try {
     if (sample) return sampleAct(target.kind, u);
-    if (target.kind === 'approve') { log(`Approving ${u.p.type.replace(/_/g, ' ')}… (PayPal sandbox)`); const r = await api(`/api/actions/${u.id}/approve`, {}); state = r.state; chime(); coinBurst(target.group.position.clone().add(new THREE.Vector3(0, 0.1, 0))); log(`✅ Done${r.result?.number ? `: invoice #${r.result.number}` : ''}${r.result?.payLink ? ' · pay link ready' : ''}`); }
-    else if (target.kind === 'reject') { const r = await api(`/api/actions/${u.id}/reject`, {}); state = r.state || state; log('Rejected. Nothing was sent to PayPal.'); }
-    else if (target.kind === 'sync') { log(`Syncing #${u.inv.number} with PayPal…`); const r = await api(`/api/invoices/${u.id}/sync`, {}); state = r.state || state; const now = r.state?.invoices?.find((i) => i.id === u.id); log(`#${u.inv.number} is ${now?.status || 'up to date'} on PayPal`); }
+    if (target.kind === 'approve') { log(`Approving ${u.p.type.replace(/_/g, ' ')}… (sandbox)`); const r = await api(`/api/actions/${u.id}/approve`, {}); state = r.state; chime(); coinBurst(target.group.position.clone().add(new THREE.Vector3(0, 0.1, 0))); log(`✅ Done${r.result?.number ? `: invoice #${r.result.number}` : ''}${r.result?.payLink ? ' · pay link ready' : ''}`); }
+    else if (target.kind === 'reject') { const r = await api(`/api/actions/${u.id}/reject`, {}); state = r.state || state; log('Rejected. Nothing was sent.'); }
+    else if (target.kind === 'sync') { log(`Syncing #${u.inv.number}…`); const r = await api(`/api/invoices/${u.id}/sync`, {}); state = r.state || state; const now = r.state?.invoices?.find((i) => i.id === u.id); log(`#${u.inv.number} is ${now?.status || 'up to date'}`); }
     else if (target.kind === 'remind') await chat(`Send a reminder for invoice #${u.inv.number}`);
     else if (target.kind === 'cancel') await chat(`Cancel invoice #${u.inv.number}`);
   } catch (e) { log(`⚠️ ${e.message}`); }
@@ -336,7 +336,7 @@ async function chat(message) {
   log(reply);
   if (wasSample) { sample = false; sampleWhy = ''; $('#sample').textContent = 'Sample data'; syncSampleLabel(); log('Switched to live data.'); }
   state = r.state;
-  if (r.proposals?.length) log(`${r.proposals.length} approval tablet(s) are on the table. Drop one in APPROVE to send it to PayPal.`);
+  if (r.proposals?.length) log(`${r.proposals.length} approval tablet(s) are on the table. Drop one in APPROVE to run it.`);
   lastSig = ''; render();
 }
 
@@ -345,7 +345,7 @@ async function showDetail(u) {
   detailPanel.visible = true;
   if (u.kind === 'pending') return detailPanel.draw((g, W, H) => { card(g, W, H); g.fillStyle = '#8fb0ff'; g.font = 'bold 30px system-ui'; g.fillText('Approval needed', 24, 50); g.fillStyle = '#fff'; g.font = '24px system-ui'; const d = u.p.data || {}; const rows = [['Action', u.p.type.replace(/_/g, ' ')], ['Client', d.clientName || d.client || d.receiver], ['Invoice', d.number && '#' + d.number], ['Amount', d.amount && fmt(d.amount, d.currency)], ['For', d.description], ['Message', d.message]].filter((r) => r[1]);
     rows.forEach(([k, v], n) => { g.fillStyle = '#7d8bbd'; g.fillText(k, 24, 100 + n * 44); g.fillStyle = '#fff'; g.fillText(String(v).slice(0, 26), 150, 100 + n * 44); });
-    g.fillStyle = '#4cd98a'; g.font = '22px system-ui'; wrapText(g, 'Drop in APPROVE to run it on PayPal, or in Reject to discard.', 24, H - 70, W - 48, 28, 2); });
+    g.fillStyle = '#4cd98a'; g.font = '22px system-ui'; wrapText(g, 'Drop in APPROVE to run it, or in Reject to discard.', 24, H - 70, W - 48, 28, 2); });
   const i = u.inv;
   let img = null;
   if (!sample && ['SENT', 'OVERDUE'].includes(i.status)) {
@@ -356,7 +356,7 @@ async function showDetail(u) {
     g.font = '26px system-ui'; g.fillStyle = '#cfd6ee';
     [i.clientName, `${fmt(i.amount, i.currency)} · ${i.status}`, `Due ${i.dueDate || '-'}`, i.description || ''].forEach((t, k) => g.fillText(String(t).slice(0, 30), 24, 92 + k * 34));
     if (img) g.drawImage(img, (W - 300) / 2, 240, 300, 300);
-    else { g.fillStyle = '#7d8bbd'; g.font = '22px system-ui'; wrapText(g, i.status === 'PAID' ? 'Paid. Nothing to collect.' : 'Scan-to-pay QR appears here for live PayPal sandbox invoices.', 24, 280, W - 48, 30); }
+    else { g.fillStyle = '#7d8bbd'; g.font = '22px system-ui'; wrapText(g, i.status === 'PAID' ? 'Paid. Nothing to collect.' : 'Scan-to-pay QR appears here for live invoices.', 24, 280, W - 48, 30); }
   });
 }
 
@@ -538,8 +538,8 @@ $('#brief').onclick = async () => {
   try { log('Writing your weekly briefing…'); const r = await api('/api/briefing', {}); state = r.state; log(r.briefing.text); speak(r.briefing.text); } catch (e) { log(`⚠️ ${e.message}`); }
 };
 $('#match').onclick = async () => {
-  if (sample) return log('Payment matching uses PayPal Transaction Search; it needs the live backend.');
-  try { log('Searching PayPal transactions…'); const r = await api('/api/reconcile', {}); state = r.state; lastSig = ''; render(); log(`Scanned ${r.scanned} transactions: ${r.suggestions.length} match(es) are now approval tablets.`); } catch (e) { log(`⚠️ ${e.message}`); }
+  if (sample) return log('Payment matching needs the live backend.');
+  try { log('Searching recent payments…'); const r = await api('/api/reconcile', {}); state = r.state; lastSig = ''; render(); log(`Scanned ${r.scanned} transactions: ${r.suggestions.length} match(es) are now approval tablets.`); } catch (e) { log(`⚠️ ${e.message}`); }
 };
 function setSample(on, why = '') {
   sample = on; sampleWhy = why; $('#sample').textContent = on ? 'Live data' : 'Sample data'; syncSampleLabel(); lastSig = '';
