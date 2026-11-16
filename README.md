@@ -48,7 +48,7 @@ Verified on the real PayPal sandbox: with a $200 limit, a $15 invoice was create
 - **Load sample data** (demo mode only) fills in a realistic client history so insights have something to show.
 
 ## 🥽 Tallyspace: the same ledger in VR and mixed reality
-Open `/vr/` (live: https://duepilot-4f2q.onrender.com/vr/) in the Meta Quest Browser, or on a laptop or phone.
+Open `/vr/` (live: https://tallyspace-vr.onrender.com) in the Meta Quest Browser, or on a laptop or phone.
 - Each invoice is a block you can pick up. Height is the amount; red is overdue, amber is waiting, green is paid.
 - Throw an invoice into **Remind**, **Cancel** or **Sync PayPal**. Remind and Cancel only create a proposal; you run it by dropping its tablet on **APPROVE**, so the approval rule is the same as in the web app.
 - An in-room console has Chase overdue, Briefing, Match payments and quick questions; a mic orb talks to the Gemini agent where the browser supports speech recognition.

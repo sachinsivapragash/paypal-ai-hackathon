@@ -35,7 +35,7 @@ Hold your unpaid invoices in your hands: a mixed-reality cash-flow room where yo
 
 ## Try it
 - In the main web app, the header has a **🥽 Tallyspace VR** button.
-- Open https://duepilot-4f2q.onrender.com/vr/ in the Meta Quest Browser, then press **Enter MR** or **Enter VR**.
+- Open https://tallyspace-vr.onrender.com in the Meta Quest Browser, then press **Enter MR** or **Enter VR**.
 - On a laptop, drag invoices into the bins with the mouse. Press **Sample data** for an offline demo.
 
 ## Demo video

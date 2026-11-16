@@ -73,7 +73,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(4500);
   await cap('Live mode runs on real PayPal sandbox invoices: reminders, QR codes, payments, webhooks');
   await sleep(4500);
-  await cap('Tallyspace · duepilot-4f2q.onrender.com/vr');
+  await cap('Tallyspace · tallyspace-vr.onrender.com');
   await sleep(3500);
 
   console.log(`recorded ${((Date.now() - t0) / 1000).toFixed(1)}s`);
