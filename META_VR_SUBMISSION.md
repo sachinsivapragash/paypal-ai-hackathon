@@ -19,7 +19,7 @@
 **Link for judges (WebXR):** https://tallyspace-vr.onrender.com
 The page opens directly into the room. On the free host the first visit after a quiet period can take up to about 50 seconds to wake up; after that it loads instantly.
 
-**Demo video:** <paste your YouTube link>
+**Demo video:** https://www.youtube.com/watch?v=VJ4m4Fl7QVY
 
 **Tagline:** Your unpaid invoices as objects you can hold: pinch one, point at a bin, let go, and approve the result from your seat.
 
